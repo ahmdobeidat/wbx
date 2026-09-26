@@ -1,0 +1,117 @@
+rules:
+  - id: wbx-js-command-injection
+    mode: taint
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: User input reaches child_process exec -> command injection / RCE.
+    metadata:
+      vuln_class: node_command_injection
+      confidence: HIGH
+      cwe: "CWE-78"
+      exploitation: "exec()/execSync() run a shell: break out with ; && | $(); read /flag."
+    pattern-sources:
+      - pattern: req.query
+      - pattern: req.body
+      - pattern: req.params
+      - pattern: req.headers
+    pattern-sinks:
+      - pattern: (child_process).exec(...)
+      - pattern: (child_process).execSync(...)
+      - pattern: cp.exec(...)
+      - pattern: exec(...)
+      - pattern: execSync(...)
+
+  - id: wbx-js-eval
+    mode: taint
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: User input reaches eval / Function constructor -> code execution.
+    metadata:
+      vuln_class: python_eval_exec
+      confidence: HIGH
+      cwe: "CWE-95"
+    pattern-sources:
+      - pattern: req.query
+      - pattern: req.body
+      - pattern: req.params
+    pattern-sinks:
+      - pattern: eval(...)
+      - pattern: Function(...)
+      - pattern: new Function(...)
+
+  - id: wbx-js-prototype-pollution
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: >
+      Recursive merge / dynamic property assignment without __proto__ guard ->
+      prototype pollution. Chain with a gadget (template opts, child env) for RCE/bypass.
+    metadata:
+      vuln_class: prototype_pollution
+      confidence: MEDIUM
+      cwe: "CWE-1321"
+      exploitation: "POST {\"__proto__\":{\"polluted\":true}} to the merge endpoint. See scaffold."
+    patterns:
+      - pattern-either:
+          # recursive-merge idiom: dst[k] = src[k] inside a loop (the classic sink)
+          - patterns:
+              - pattern-inside: "for (...) { ... }"
+              - pattern: $DST[$K] = $SRC[$K]
+          # dynamic deep-set helper: obj[a][b] = v
+          - pattern: $OBJ[$K1][$K2] = $V
+          - pattern: Object.assign($T, JSON.parse(...))
+
+  - id: wbx-js-nosql-injection
+    mode: taint
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: User input reaches a Mongo query object -> NoSQL injection (operator injection).
+    metadata:
+      vuln_class: nosql_injection
+      confidence: MEDIUM
+      cwe: "CWE-943"
+      exploitation: "Send {\"$ne\":null} / {\"$gt\":\"\"} to bypass auth or dump."
+    pattern-sources:
+      - pattern: req.query
+      - pattern: req.body
+      - pattern: req.params
+    pattern-sinks:
+      - pattern: $COL.find(...)
+      - pattern: $COL.findOne(...)
+      - pattern: $COL.findOneAndUpdate(...)
+      - pattern: $MODEL.findOne(...)
+
+  - id: wbx-js-jwt-none
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >
+      JWT verification allows the 'none' algorithm or skips verification. Forge
+      tokens without the secret.
+    metadata:
+      vuln_class: jwt_none_alg
+      confidence: HIGH
+      cwe: "CWE-347"
+      exploitation: "Craft header alg:none with empty signature. See scaffold."
+    patterns:
+      - pattern-either:
+          - pattern: 'jwt.verify(..., {algorithms: [..., "none", ...]})'
+          - pattern: jwt.decode($T)
+          - pattern: 'jwt.verify($T, $S, {algorithms: ["none"]})'
+
+  - id: wbx-js-path-traversal
+    mode: taint
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: User input reaches a filesystem read/sendFile -> path traversal.
+    metadata:
+      vuln_class: path_traversal
+      confidence: MEDIUM
+      cwe: "CWE-22"
+    pattern-sources:
+      - pattern: req.query
+      - pattern: req.body
+      - pattern: req.params
+    pattern-sinks:
+      - pattern: fs.readFile(...)
+      - pattern: fs.readFileSync(...)
+      - pattern: fs.createReadStream(...)
+      - pattern: res.sendFile(...)

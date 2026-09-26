@@ -1,0 +1,9 @@
+name: php-upload-lfi-01
+description: unrestricted upload + include of upload path -> RCE (two-primitive chain)
+expect_findings:
+  - vuln_class: file_upload
+    file: source/upload.php
+  - vuln_class: php_lfi
+    file: source/view.php
+expect_top_class: php_lfi
+expect_chain: upload_plus_lfi_rce

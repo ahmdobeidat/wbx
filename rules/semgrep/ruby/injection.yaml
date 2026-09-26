@@ -1,0 +1,62 @@
+rules:
+  - id: wbx-rb-yaml-load
+    languages: [ruby]
+    severity: ERROR
+    message: YAML.load (not safe_load) deserializes arbitrary Ruby objects -> RCE.
+    metadata:
+      vuln_class: ruby_yaml_load
+      confidence: HIGH
+      cwe: "CWE-502"
+      exploitation: "Craft a YAML gadget chain (e.g. via Psych/DEPRECATED classes)."
+    patterns:
+      - pattern-either:
+          - pattern: YAML.load(...)
+          - pattern: Psych.load(...)
+          - pattern: Marshal.load(...)
+      - pattern-not: YAML.safe_load(...)
+
+  - id: wbx-rb-command-injection
+    languages: [ruby]
+    severity: ERROR
+    message: OS command executed with interpolated input -> command injection.
+    metadata:
+      vuln_class: command_injection
+      confidence: MEDIUM
+      cwe: "CWE-78"
+      exploitation: "Interpolated string in system/`` runs a shell; break out and read /flag."
+    patterns:
+      - pattern-either:
+          - pattern: system("...#{...}...")
+          - pattern: exec("...#{...}...")
+          - pattern: '`...#{...}...`'
+          - pattern: IO.popen("...#{...}...")
+          - pattern: Open3.capture2("...#{...}...")
+
+  - id: wbx-rb-eval
+    languages: [ruby]
+    severity: ERROR
+    message: Dynamic eval / send with input -> code execution.
+    metadata:
+      vuln_class: python_eval_exec
+      confidence: MEDIUM
+      cwe: "CWE-95"
+    patterns:
+      - pattern-either:
+          - pattern: eval(...)
+          - pattern: instance_eval(...)
+          - pattern: $OBJ.send(params[...], ...)
+
+  - id: wbx-rb-mass-assignment
+    languages: [ruby]
+    severity: WARNING
+    message: Model updated directly from params without permit -> mass assignment.
+    metadata:
+      vuln_class: mass_assignment
+      confidence: LOW
+      cwe: "CWE-915"
+      exploitation: "Add admin=true / role=admin to the params body."
+    patterns:
+      - pattern-either:
+          - pattern: $M.new(params[...])
+          - pattern: $M.update(params[...])
+          - pattern: $M.update_attributes(params[...])

@@ -1,0 +1,7 @@
+name: php-lfi-01
+description: include() concatenating $_GET['page'] -> LFI/RFI
+expect_findings:
+  - vuln_class: php_lfi
+    file: source/index.php
+expect_top_class: php_lfi
+expect_chain: lfi_to_rce

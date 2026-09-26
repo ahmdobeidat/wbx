@@ -1,0 +1,4 @@
+name: benign-php-01
+description: clean PHP (prepared stmt, escaped output, hash_equals) -> no injection findings
+expect_no_classes: [php_sqli, php_object_injection, php_lfi, php_command_injection, php_type_juggling]
+expect_top_class: null

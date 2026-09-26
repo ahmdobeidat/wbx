@@ -1,0 +1,7 @@
+name: python-pickle-01
+description: request data base64-decoded into pickle.loads -> RCE
+expect_findings:
+  - vuln_class: python_pickle
+    file: source/app.py
+expect_top_class: python_pickle
+expect_chain: deserialization_to_rce

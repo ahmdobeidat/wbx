@@ -1,0 +1,14 @@
+id: upload_plus_lfi_rce
+name: File upload + LFI -> RCE
+impact: Remote code execution (drop a payload, include it)
+bonus: 10
+requires:
+  - any_of: [file_upload]
+  - any_of: [php_lfi, path_traversal]
+playbook: |
+  Two primitives compose into RCE:
+  1. Upload a file whose CONTENT is PHP (extension filter often ignores content).
+     Even a .png/.txt works if you can include it by path.
+  2. Use the LFI to include the uploaded file's path -> your PHP runs.
+  3. If upload path is unknown, brute the known upload dir from source, or read it
+     via the LFI first.

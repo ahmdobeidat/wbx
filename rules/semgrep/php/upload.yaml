@@ -1,0 +1,14 @@
+rules:
+  - id: wbx-php-file-upload
+    languages: [php]
+    severity: WARNING
+    message: >
+      File upload handling (move_uploaded_file). Check extension/content/MIME
+      validation. Combined with an include primitive this is upload-to-RCE.
+    metadata:
+      vuln_class: file_upload
+      confidence: MEDIUM
+      cwe: "CWE-434"
+      exploitation: "Upload PHP content; if you can include the path (LFI) it executes."
+    patterns:
+      - pattern: move_uploaded_file(...)

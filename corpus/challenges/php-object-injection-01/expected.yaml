@@ -1,0 +1,7 @@
+name: php-object-injection-01
+description: unserialize() on $_GET with a __destruct gadget -> POP chain
+expect_findings:
+  - vuln_class: php_object_injection
+    file: source/index.php
+expect_top_class: php_object_injection
+expect_chain: deserialization_to_rce

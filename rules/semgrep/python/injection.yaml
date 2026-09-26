@@ -1,0 +1,153 @@
+rules:
+  - id: wbx-py-ssti
+    mode: taint
+    languages: [python]
+    severity: ERROR
+    message: >
+      User input reaches a template render as a string (SSTI). Jinja2
+      render_template_string / Template(...).render with tainted content -> RCE.
+    metadata:
+      vuln_class: ssti
+      confidence: HIGH
+      cwe: "CWE-1336"
+      exploitation: "{{7*7}} to confirm, then {{cycler.__init__.__globals__.os.popen('id').read()}}."
+    pattern-sources:
+      - patterns:
+          - pattern: request.$ANY
+      - pattern: flask.request.args.get(...)
+    pattern-sinks:
+      - pattern: render_template_string(...)
+      - pattern: flask.render_template_string(...)
+      - pattern: Template(...).render(...)
+      - pattern: $ENV.from_string(...)
+
+  - id: wbx-py-pickle
+    mode: taint
+    languages: [python]
+    severity: ERROR
+    message: User input reaches pickle/cPickle load(s) -> deserialization RCE via __reduce__.
+    metadata:
+      vuln_class: python_pickle
+      confidence: HIGH
+      cwe: "CWE-502"
+      exploitation: "Craft a pickle whose __reduce__ runs os.system. See scaffold."
+    pattern-sources:
+      - patterns:
+          - pattern: request.$ANY
+      - pattern: base64.b64decode(...)
+    pattern-sinks:
+      - pattern: pickle.loads(...)
+      - pattern: pickle.load(...)
+      - pattern: cPickle.loads(...)
+      - pattern: _pickle.loads(...)
+
+  - id: wbx-py-yaml-load
+    languages: [python]
+    severity: ERROR
+    message: yaml.load without SafeLoader constructs arbitrary Python objects -> RCE.
+    metadata:
+      vuln_class: python_yaml_load
+      confidence: HIGH
+      cwe: "CWE-502"
+      exploitation: "!!python/object/apply:os.system ['cat /flag']."
+    patterns:
+      - pattern-either:
+          - pattern: yaml.load($X)
+          - pattern: yaml.load($X, Loader=yaml.Loader)
+          - pattern: yaml.load($X, Loader=yaml.FullLoader)
+          - pattern: yaml.unsafe_load(...)
+      - pattern-not: yaml.load($X, Loader=yaml.SafeLoader)
+
+  - id: wbx-py-eval-exec
+    mode: taint
+    languages: [python]
+    severity: ERROR
+    message: User input reaches eval/exec/compile -> Python code execution.
+    metadata:
+      vuln_class: python_eval_exec
+      confidence: HIGH
+      cwe: "CWE-95"
+      exploitation: "__import__('os').system('cat /flag')."
+    pattern-sources:
+      - patterns:
+          - pattern: request.$ANY
+    pattern-sinks:
+      - pattern: eval(...)
+      - pattern: exec(...)
+
+  - id: wbx-py-command-injection
+    mode: taint
+    languages: [python]
+    severity: ERROR
+    message: User input reaches an OS command sink -> command injection / RCE.
+    metadata:
+      vuln_class: command_injection
+      confidence: HIGH
+      cwe: "CWE-78"
+      exploitation: "shell=True or os.system: break out with ; && | $(); read /flag."
+    pattern-sources:
+      - patterns:
+          - pattern: request.$ANY
+    pattern-sinks:
+      - pattern: os.system(...)
+      - pattern: os.popen(...)
+      - patterns:
+          - pattern: subprocess.$FN(..., shell=True, ...)
+      - pattern: commands.getoutput(...)
+
+  - id: wbx-py-path-traversal
+    mode: taint
+    languages: [python]
+    severity: ERROR
+    message: User input reaches open()/send_file path -> path traversal / arbitrary file read.
+    metadata:
+      vuln_class: path_traversal
+      confidence: MEDIUM
+      cwe: "CWE-22"
+      exploitation: "../../../flag.txt or absolute /flag.txt."
+    pattern-sources:
+      - patterns:
+          - pattern: request.$ANY
+    pattern-sinks:
+      - pattern: open(...)
+      - pattern: flask.send_file(...)
+      - pattern: send_file(...)
+      - pattern: send_from_directory(...)
+
+  - id: wbx-py-ssrf
+    mode: taint
+    languages: [python]
+    severity: WARNING
+    message: User input reaches an outbound HTTP client -> SSRF (hit internal services / metadata).
+    metadata:
+      vuln_class: ssrf
+      confidence: MEDIUM
+      cwe: "CWE-918"
+      exploitation: "Point at 127.0.0.1 / 169.254.169.254 / internal admin."
+    pattern-sources:
+      - patterns:
+          - pattern: request.$ANY
+    pattern-sinks:
+      - pattern: requests.get(...)
+      - pattern: requests.post(...)
+      - pattern: requests.$M(...)
+      - pattern: urllib.request.urlopen(...)
+      - pattern: urlopen(...)
+
+  - id: wbx-py-sqli
+    mode: taint
+    languages: [python]
+    severity: ERROR
+    message: User input flows into a SQL string (f-string/%/+/.format) -> SQL injection.
+    metadata:
+      vuln_class: sql_injection
+      confidence: HIGH
+      cwe: "CWE-89"
+      exploitation: "UNION SELECT; mixed-case if a keyword filter is present."
+    pattern-sources:
+      - patterns:
+          - pattern: request.$ANY
+    pattern-sinks:
+      - pattern: $CUR.execute(...)
+      - pattern: $CUR.executemany(...)
+      - pattern: $DB.execute(...)

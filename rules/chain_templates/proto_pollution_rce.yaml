@@ -1,0 +1,11 @@
+id: proto_pollution_to_rce
+name: Prototype pollution -> RCE / auth bypass
+impact: RCE (gadget) or privilege bypass via polluted Object.prototype
+bonus: 7
+requires:
+  - any_of: [prototype_pollution]
+playbook: |
+  1. Pollute via __proto__ / constructor.prototype in a merge or dynamic-set sink.
+  2. Auth bypass gadget: pollute isAdmin/role so later checks read the polluted default.
+  3. RCE gadget (Node): template engine options (EJS outputFunctionName), child_process
+     env/shell, or a lib that reads an option off the prototype. Match the gadget to deps.

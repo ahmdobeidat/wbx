@@ -1,0 +1,7 @@
+name: python-yaml-01
+description: yaml.load without SafeLoader -> arbitrary object construction
+expect_findings:
+  - vuln_class: python_yaml_load
+    file: source/app.py
+expect_top_class: python_yaml_load
+expect_chain: deserialization_to_rce

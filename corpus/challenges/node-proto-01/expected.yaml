@@ -1,0 +1,7 @@
+name: node-proto-01
+description: recursive merge of req.body without __proto__ guard -> prototype pollution
+expect_findings:
+  - vuln_class: prototype_pollution
+    file: source/server.js
+expect_top_class: prototype_pollution
+expect_chain: proto_pollution_to_rce

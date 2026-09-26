@@ -1,0 +1,6 @@
+name: php-typejuggle-01
+description: md5(input) == 0e-hash loose comparison -> magic hash auth bypass
+expect_findings:
+  - vuln_class: php_type_juggling
+    file: source/login.php
+expect_top_class: php_type_juggling

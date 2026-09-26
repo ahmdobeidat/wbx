@@ -1,0 +1,116 @@
+rules:
+  - id: wbx-php-object-injection
+    mode: taint
+    languages: [php]
+    severity: ERROR
+    message: >
+      User input reaches unserialize(). With a class exposing __wakeup / __destruct
+      / __toString this is PHP object injection (POP chain) -> often RCE or file ops.
+    metadata:
+      vuln_class: php_object_injection
+      confidence: HIGH
+      cwe: "CWE-502"
+      exploitation: "Find a gadget class with a useful magic method; craft the serialized object. See generated scaffold."
+    pattern-sources:
+      - pattern: $_GET
+      - pattern: $_POST
+      - pattern: $_REQUEST
+      - pattern: $_COOKIE
+      - pattern: file_get_contents("php://input")
+    pattern-sinks:
+      - pattern: unserialize(...)
+
+  - id: wbx-php-lfi
+    mode: taint
+    languages: [php]
+    severity: ERROR
+    message: >
+      User input reaches a file-inclusion / read sink. LFI/RFI: read source with
+      php://filter, read the flag, or RCE via wrappers/log poisoning.
+    metadata:
+      vuln_class: php_lfi
+      confidence: HIGH
+      cwe: "CWE-98"
+      exploitation: "Try php://filter base64 on source, /flag.txt, log poisoning, data:// if allow_url_include."
+    pattern-sources:
+      - pattern: $_GET
+      - pattern: $_POST
+      - pattern: $_REQUEST
+      - pattern: $_COOKIE
+    pattern-sinks:
+      - pattern: include(...)
+      - pattern: include_once(...)
+      - pattern: require(...)
+      - pattern: require_once(...)
+      - pattern: file_get_contents(...)
+      - pattern: readfile(...)
+      - pattern: fopen(...)
+      - pattern: show_source(...)
+      - pattern: highlight_file(...)
+
+  - id: wbx-php-command-injection
+    mode: taint
+    languages: [php]
+    severity: ERROR
+    message: User input reaches a shell-exec sink -> command injection / RCE.
+    metadata:
+      vuln_class: php_command_injection
+      confidence: HIGH
+      cwe: "CWE-78"
+      exploitation: "Break out with ; && | $() backticks; read /flag.txt."
+    pattern-sources:
+      - pattern: $_GET
+      - pattern: $_POST
+      - pattern: $_REQUEST
+      - pattern: $_COOKIE
+    pattern-sinks:
+      - pattern: system(...)
+      - pattern: exec(...)
+      - pattern: shell_exec(...)
+      - pattern: passthru(...)
+      - pattern: popen(...)
+      - pattern: proc_open(...)
+      - pattern: pcntl_exec(...)
+
+  - id: wbx-php-sqli
+    mode: taint
+    languages: [php]
+    severity: ERROR
+    message: User input flows into a SQL query string -> SQL injection.
+    metadata:
+      vuln_class: php_sqli
+      confidence: HIGH
+      cwe: "CWE-89"
+      exploitation: "You have the query: count columns, UNION SELECT; use mixed-case uNiOn if a keyword filter exists."
+    pattern-sources:
+      - pattern: $_GET
+      - pattern: $_POST
+      - pattern: $_REQUEST
+      - pattern: $_COOKIE
+    pattern-sinks:
+      - pattern: mysqli_query(...)
+      - pattern: mysql_query(...)
+      - pattern: $DB->query(...)
+      - pattern: $DB->exec(...)
+      - pattern: $DB->prepare(...)
+      - pattern: pg_query(...)
+
+  - id: wbx-php-eval
+    mode: taint
+    languages: [php]
+    severity: ERROR
+    message: User input reaches eval()/assert()/create_function -> PHP code execution.
+    metadata:
+      vuln_class: php_eval
+      confidence: HIGH
+      cwe: "CWE-95"
+      exploitation: "Inject PHP; call system() / read the flag."
+    pattern-sources:
+      - pattern: $_GET
+      - pattern: $_POST
+      - pattern: $_REQUEST
+      - pattern: $_COOKIE
+    pattern-sinks:
+      - pattern: eval(...)
+      - pattern: assert(...)
+      - pattern: create_function(...)

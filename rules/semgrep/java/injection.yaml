@@ -1,0 +1,69 @@
+rules:
+  - id: wbx-java-deserialization
+    languages: [java]
+    severity: ERROR
+    message: ObjectInputStream.readObject on untrusted data -> Java deserialization RCE.
+    metadata:
+      vuln_class: java_deserialization
+      confidence: HIGH
+      cwe: "CWE-502"
+      exploitation: "Use ysoserial gadget chain matching the classpath (CommonsCollections, etc)."
+    patterns:
+      - pattern-either:
+          - pattern: (ObjectInputStream $O).readObject()
+          - pattern: new ObjectInputStream(...).readObject()
+
+  - id: wbx-java-command-injection
+    languages: [java]
+    severity: ERROR
+    message: Runtime.exec / ProcessBuilder with input -> command injection.
+    metadata:
+      vuln_class: command_injection
+      confidence: MEDIUM
+      cwe: "CWE-78"
+    patterns:
+      - pattern-either:
+          - pattern: Runtime.getRuntime().exec(...)
+          - pattern: new ProcessBuilder(...)
+
+  - id: wbx-java-sqli
+    languages: [java]
+    severity: ERROR
+    message: SQL string built with concatenation passed to a Statement -> SQL injection.
+    metadata:
+      vuln_class: sql_injection
+      confidence: MEDIUM
+      cwe: "CWE-89"
+    patterns:
+      - pattern-either:
+          - pattern: $ST.executeQuery($Q + $X)
+          - pattern: $ST.execute($Q + $X)
+          - pattern: $ST.executeUpdate($Q + $X)
+
+  - id: wbx-java-ssti
+    languages: [java]
+    severity: WARNING
+    message: Template built from user input (Freemarker/Velocity/Thymeleaf) -> SSTI.
+    metadata:
+      vuln_class: ssti
+      confidence: LOW
+      cwe: "CWE-1336"
+      exploitation: "Freemarker: ${...?new()} Execute gadget."
+    patterns:
+      - pattern-either:
+          - pattern: new Template($N, new StringReader(...), ...)
+          - pattern: $VE.evaluate(...)
+
+  - id: wbx-java-xxe
+    languages: [java]
+    severity: WARNING
+    message: XML parser without external-entity hardening -> XXE.
+    metadata:
+      vuln_class: xxe
+      confidence: LOW
+      cwe: "CWE-611"
+    patterns:
+      - pattern-either:
+          - pattern: DocumentBuilderFactory.newInstance()
+          - pattern: SAXParserFactory.newInstance()
+          - pattern: XMLInputFactory.newInstance()

@@ -1,0 +1,26 @@
+[project]
+name = "wbx"
+version = "0.1.0"
+description = "Deterministic offline static-analysis for white-box web CTF source review"
+requires-python = ">=3.11"
+dependencies = [
+    "pyyaml>=6.0",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+wbx = "wbx.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["wbx"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

@@ -1,0 +1,72 @@
+rules:
+  - id: wbx-php-magic-hash-compare
+    languages: [php]
+    severity: WARNING
+    message: >
+      Loose (==) comparison on a hash. PHP type juggling: a "0e..." magic hash
+      compares equal to another "0e..." (both parse as 0). Auth bypass.
+    metadata:
+      vuln_class: php_type_juggling
+      confidence: HIGH
+      cwe: "CWE-697"
+      exploitation: "Send an input whose md5/sha1 is 0e[digits] (e.g. 240610708). See scaffold."
+    patterns:
+      - pattern-either:
+          - pattern: md5(...) == $Y
+          - pattern: $Y == md5(...)
+          - pattern: sha1(...) == $Y
+          - pattern: $Y == sha1(...)
+          - pattern: hash(...) == $Y
+          - pattern: $Y == hash(...)
+
+  - id: wbx-php-strcmp-bypass
+    languages: [php]
+    severity: WARNING
+    message: >
+      strcmp() result loosely compared. Passing an array makes strcmp() return
+      NULL, and NULL == 0 is true -> comparison bypass.
+    metadata:
+      vuln_class: php_type_juggling
+      confidence: HIGH
+      cwe: "CWE-697"
+      exploitation: "Send param as array (param[]=x) so strcmp returns NULL == 0. See scaffold."
+    patterns:
+      - pattern-either:
+          - pattern: strcmp(...) == 0
+          - pattern: strcmp(...) == $Y
+          - pattern: strcmp(...) != 0
+
+  - id: wbx-php-preg-replace-eval
+    languages: [php]
+    severity: ERROR
+    message: >
+      preg_replace with the /e modifier evaluates the replacement as PHP code.
+      If the pattern or subject is attacker-influenced this is RCE.
+    metadata:
+      vuln_class: php_preg_replace_eval
+      confidence: HIGH
+      cwe: "CWE-95"
+      exploitation: "The /e flag executes replacement as PHP; inject code into the matched group."
+    patterns:
+      - pattern: preg_replace($PAT, ...)
+      - metavariable-regex:
+          metavariable: $PAT
+          regex: '["''][^"'']*/[a-zA-Z]*e[a-zA-Z]*["'']'
+
+  - id: wbx-php-loose-input-compare
+    languages: [php]
+    severity: INFO
+    message: >
+      User input in a loose (==) comparison. In PHP < 8, "abc" == 0 is true and
+      numeric-string juggling can bypass checks. Verify the compare is === .
+    metadata:
+      vuln_class: php_type_juggling
+      confidence: LOW
+      cwe: "CWE-697"
+    patterns:
+      - pattern-either:
+          - pattern: $_GET[...] == $Y
+          - pattern: $_POST[...] == $Y
+          - pattern: $_REQUEST[...] == $Y
+          - pattern: $Y == $_GET[...]
+          - pattern: $Y == $_POST[...]

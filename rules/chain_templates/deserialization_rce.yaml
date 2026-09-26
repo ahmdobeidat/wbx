@@ -1,0 +1,13 @@
+id: deserialization_to_rce
+name: Insecure deserialization -> RCE
+impact: Remote code execution via object/gadget chain
+bonus: 8
+requires:
+  - any_of: [php_object_injection, insecure_deserialization, python_pickle, python_yaml_load, ruby_yaml_load, java_deserialization]
+playbook: |
+  1. Confirm the sink deserializes attacker-controlled bytes.
+  2. Find a gadget:
+     - PHP: a class with __wakeup/__destruct/__toString doing something useful (file write, system).
+     - Python: pickle __reduce__ -> os.system (scaffold provided).
+     - Ruby/Java: known gadget chains (ysoserial for Java).
+  3. Serialize, deliver via the tainted param, read the flag.

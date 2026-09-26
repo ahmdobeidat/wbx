@@ -1,0 +1,6 @@
+name: node-cmdi-01
+description: req.query.host concatenated into child_process.exec -> RCE
+expect_findings:
+  - vuln_class: node_command_injection
+    file: source/server.js
+expect_top_class: node_command_injection

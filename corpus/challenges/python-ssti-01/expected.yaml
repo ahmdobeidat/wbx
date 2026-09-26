@@ -1,0 +1,7 @@
+name: python-ssti-01
+description: request arg concatenated into render_template_string -> SSTI
+expect_findings:
+  - vuln_class: ssti
+    file: source/app.py
+expect_top_class: ssti
+expect_chain: ssti_to_rce
