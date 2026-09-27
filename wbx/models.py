@@ -21,6 +21,8 @@ VULN_CLASSES = {
     "php_preg_replace_eval",
     "php_command_injection",
     "php_eval",
+    "php_variable_override",
+    "header_injection",
     "php_sqli",
     # Python-leaning
     "ssti",

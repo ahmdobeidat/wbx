@@ -1,0 +1,6 @@
+name: php-header-injection-01
+description: user input into header() -> header injection / open redirect
+expect_findings:
+  - vuln_class: header_injection
+    file: source/redirect.php
+expect_top_class: header_injection

@@ -1,0 +1,6 @@
+name: php-exec-nonliteral-01
+description: system() on a non-literal built from input (taint may not track the transform)
+expect_findings:
+  - vuln_class: php_command_injection
+    file: source/run.php
+expect_top_class: php_command_injection

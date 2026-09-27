@@ -1,0 +1,64 @@
+rules:
+  - id: wbx-php-header-injection
+    mode: taint
+    languages: [php]
+    severity: WARNING
+    message: >
+      User-controlled data reaches header(). Enables open redirect, host-header
+      poisoning, and (on older PHP) HTTP response splitting.
+    metadata:
+      vuln_class: header_injection
+      confidence: MEDIUM
+      cwe: "CWE-113"
+      exploitation: "Control Location: for open redirect; inject CRLF on unpatched PHP for response splitting."
+    pattern-sources:
+      - pattern: $_GET
+      - pattern: $_POST
+      - pattern: $_REQUEST
+      - pattern: $_SERVER['HTTP_HOST']
+      - pattern: $_SERVER['PHP_SELF']
+      - pattern: $_SERVER['REQUEST_URI']
+      - pattern: $_SERVER[...]
+    pattern-sinks:
+      - pattern: header(...)
+
+  - id: wbx-php-exec-nonliteral
+    languages: [php]
+    severity: WARNING
+    message: >
+      A shell-exec sink is called with a non-literal argument (built variable,
+      implode, concatenation). If any part is user-influenced this is command
+      injection -- taint may not track through intermediate transforms, so verify.
+    metadata:
+      vuln_class: php_command_injection
+      confidence: MEDIUM
+      cwe: "CWE-78"
+      exploitation: "Trace the argument back to input; inject via the transform (e.g. array element / yaml)."
+    patterns:
+      - pattern-either:
+          - pattern: system($X)
+          - pattern: system($X, ...)
+          - pattern: exec($X, ...)
+          - pattern: shell_exec($X)
+          - pattern: passthru($X, ...)
+          - pattern: popen($X, ...)
+          - pattern: proc_open($X, ...)
+      - metavariable-pattern:
+          metavariable: $X
+          patterns:
+            - pattern-not-regex: '^\s*["''][^"'']*["'']\s*$'
+
+  - id: wbx-php-yaml-parse
+    languages: [php]
+    severity: ERROR
+    message: >
+      yaml_parse() on attacker-influenced input. YAML injection can alter parsed
+      structure and, with object support, instantiate arbitrary objects -> RCE.
+    metadata:
+      vuln_class: insecure_deserialization
+      confidence: MEDIUM
+      cwe: "CWE-502"
+      exploitation: "Break the YAML to inject list/map entries or !!php/object tags."
+    patterns:
+      - pattern: yaml_parse($X)
+      - pattern-not: yaml_parse("...")

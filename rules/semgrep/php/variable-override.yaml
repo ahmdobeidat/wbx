@@ -1,0 +1,42 @@
+rules:
+  - id: wbx-php-variable-override
+    languages: [php]
+    severity: ERROR
+    message: >
+      User input is imported into the local/global scope as variables (extract /
+      parse_str / import_request_variables / variable-variables over a superglobal).
+      An attacker can set any uninitialised variable the script later trusts
+      (auth flags, config, command names) -> auth bypass / logic control / RCE.
+    metadata:
+      vuln_class: php_variable_override
+      confidence: HIGH
+      cwe: "CWE-473"
+      exploitation: "Send params named after variables the script uses uninitialised (e.g. &admin=1)."
+    patterns:
+      - pattern-either:
+          - pattern: extract($_GET)
+          - pattern: extract($_POST)
+          - pattern: extract($_REQUEST)
+          - pattern: extract($_COOKIE)
+          - pattern: extract($_SERVER)
+          - pattern: import_request_variables(...)
+          - pattern: parse_str($_GET[...])
+          - pattern: parse_str($_POST[...])
+          - pattern: parse_str($_SERVER[...])
+          # variable-variable assignment: ${$k} = ... writes to an attacker-named
+          # variable (the luatic-style override idiom, often loop-driven, no braces)
+          - pattern: ${$K} = $VAL
+
+  - id: wbx-php-parse-str-no-result
+    languages: [php]
+    severity: WARNING
+    message: >
+      parse_str() called without a result array writes parsed keys into local
+      variables (variable override), same risk as extract() on user input.
+    metadata:
+      vuln_class: php_variable_override
+      confidence: MEDIUM
+      cwe: "CWE-473"
+    patterns:
+      - pattern: parse_str($S)
+      - pattern-not: parse_str($S, $ARR)

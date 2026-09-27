@@ -39,6 +39,8 @@ _CLASS_DANGER = {
     "jwt_none_alg": 7,
     "auth_bypass": 7,
     "php_type_juggling": 6,
+    "php_variable_override": 8,
+    "header_injection": 5,
     "mass_assignment": 5,
     "file_upload": 6,
     "open_redirect": 3,
@@ -66,9 +68,9 @@ _TIER = {
     # escalates to RCE via wrappers/log poisoning, unlike generic path traversal.
     "sql_injection": 2, "php_sqli": 2, "nosql_injection": 2, "prototype_pollution": 2,
     "php_rfi": 2, "jwt_none_alg": 2, "auth_bypass": 2, "php_type_juggling": 2,
-    "php_lfi": 2,
+    "php_lfi": 2, "php_variable_override": 2,
     # --- Tier 3: disclosure / traversal / SSRF / needs-a-chain ---
-    "path_traversal": 3, "ssrf": 3, "xxe": 3, "file_upload": 3,
+    "path_traversal": 3, "ssrf": 3, "xxe": 3, "file_upload": 3, "header_injection": 3,
     # --- Tier 4: lower impact ---
     "mass_assignment": 4, "open_redirect": 4, "xss": 4, "hardcoded_secret": 4,
     "uncategorized": 4,

@@ -1,0 +1,6 @@
+name: php-variable-override-01
+description: extract($_GET) lets attacker override $is_admin -> auth bypass
+expect_findings:
+  - vuln_class: php_variable_override
+    file: source/index.php
+expect_top_class: php_variable_override
