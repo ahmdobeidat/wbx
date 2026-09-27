@@ -1,0 +1,6 @@
+name: ruby-open-cmdi-01
+description: Kernel#open on a non-literal -> command injection via leading pipe
+expect_findings:
+  - vuln_class: command_injection
+    file: source/reader.rb
+expect_top_class: command_injection

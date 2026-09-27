@@ -52,10 +52,18 @@ rules:
       exploitation: "POST {\"__proto__\":{\"polluted\":true}} to the merge endpoint. See scaffold."
     patterns:
       - pattern-either:
-          # recursive-merge idiom: dst[k] = src[k] inside a loop (the classic sink)
+          # recursive-merge idiom: computed-key assignment keyed by a for..in loop
+          # variable (the classic pollution sink). RHS may be src[k] or a temp var.
+          # for..in only (not a plain index loop) to avoid array-write false positives.
           - patterns:
-              - pattern-inside: "for (...) { ... }"
-              - pattern: $DST[$K] = $SRC[$K]
+              - pattern-inside: "for (const $K in $SRC) { ... }"
+              - pattern: $DST[$K] = $V
+          - patterns:
+              - pattern-inside: "for (let $K in $SRC) { ... }"
+              - pattern: $DST[$K] = $V
+          - patterns:
+              - pattern-inside: "for (var $K in $SRC) { ... }"
+              - pattern: $DST[$K] = $V
           # dynamic deep-set helper: obj[a][b] = v
           - pattern: $OBJ[$K1][$K2] = $V
           - pattern: Object.assign($T, JSON.parse(...))
@@ -96,6 +104,32 @@ rules:
           - pattern: 'jwt.verify(..., {algorithms: [..., "none", ...]})'
           - pattern: jwt.decode($T)
           - pattern: 'jwt.verify($T, $S, {algorithms: ["none"]})'
+
+  - id: wbx-js-ssrf
+    mode: taint
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: User input reaches an outbound HTTP client -> SSRF (internal services / metadata).
+    metadata:
+      vuln_class: ssrf
+      confidence: MEDIUM
+      cwe: "CWE-918"
+      exploitation: "Point at 127.0.0.1 / 0.0.0.0 / 169.254.169.254 / internal admin route."
+    pattern-sources:
+      - pattern: req.query
+      - pattern: req.body
+      - pattern: req.params
+      - pattern: req.headers
+    pattern-sinks:
+      - pattern: http.get(...)
+      - pattern: https.get(...)
+      - pattern: http.request(...)
+      - pattern: https.request(...)
+      - pattern: axios(...)
+      - pattern: axios.$M(...)
+      - pattern: fetch(...)
+      - pattern: $CLIENT.get(...)
+      - pattern: $CLIENT.request(...)
 
   - id: wbx-js-path-traversal
     mode: taint

@@ -1,0 +1,6 @@
+name: python-yaml-aliased-01
+description: yaml.load with an aliased non-safe Loader must still be flagged
+expect_findings:
+  - vuln_class: python_yaml_load
+    file: source/lib.py
+expect_top_class: python_yaml_load

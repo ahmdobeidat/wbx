@@ -1,0 +1,6 @@
+name: js-proto-tempvar-01
+description: recursive merge assigning target[key]=val (temp var) via for-in -> prototype pollution
+expect_findings:
+  - vuln_class: prototype_pollution
+    file: source/merge.js
+expect_top_class: prototype_pollution

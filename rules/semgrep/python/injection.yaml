@@ -21,6 +21,25 @@ rules:
       - pattern: Template(...).render(...)
       - pattern: $ENV.from_string(...)
 
+  - id: wbx-py-ssti-nonliteral
+    languages: [python]
+    severity: WARNING
+    message: >
+      render_template_string() on a non-literal template. If any part of the
+      template string is user-controlled (even built in another function/file)
+      this is SSTI. Catches multi-hop cases intra-procedural taint misses.
+    metadata:
+      vuln_class: ssti
+      confidence: MEDIUM
+      cwe: "CWE-1336"
+      exploitation: "{{7*7}} then {{cycler.__init__.__globals__.os.popen('cat /flag').read()}}."
+    patterns:
+      - pattern-either:
+          - pattern: render_template_string($X, ...)
+          - pattern: flask.render_template_string($X, ...)
+      - pattern-not: render_template_string("...", ...)
+      - pattern-not: flask.render_template_string("...", ...)
+
   - id: wbx-py-pickle
     mode: taint
     languages: [python]
@@ -52,11 +71,12 @@ rules:
       exploitation: "!!python/object/apply:os.system ['cat /flag']."
     patterns:
       - pattern-either:
-          - pattern: yaml.load($X)
-          - pattern: yaml.load($X, Loader=yaml.Loader)
-          - pattern: yaml.load($X, Loader=yaml.FullLoader)
+          - pattern: yaml.load(...)
           - pattern: yaml.unsafe_load(...)
-      - pattern-not: yaml.load($X, Loader=yaml.SafeLoader)
+      - pattern-not: yaml.load(..., Loader=yaml.SafeLoader)
+      - pattern-not: yaml.load(..., Loader=yaml.CSafeLoader)
+      - pattern-not: yaml.load(..., Loader=SafeLoader)
+      - pattern-not: yaml.load(..., Loader=CSafeLoader)
 
   - id: wbx-py-eval-exec
     mode: taint

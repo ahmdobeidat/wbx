@@ -1,0 +1,6 @@
+name: php-sqli-concat-01
+description: SQL string built by concatenation, source arrives via function param (cross-scope)
+expect_findings:
+  - vuln_class: php_sqli
+    file: source/Model.php
+expect_top_class: php_sqli

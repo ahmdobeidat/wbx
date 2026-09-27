@@ -1,0 +1,6 @@
+name: python-ssti-nonliteral-01
+description: render_template_string on a non-literal built in another function -> SSTI
+expect_findings:
+  - vuln_class: ssti
+    file: source/app.py
+expect_top_class: ssti

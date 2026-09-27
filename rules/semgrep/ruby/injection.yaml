@@ -32,6 +32,26 @@ rules:
           - pattern: IO.popen("...#{...}...")
           - pattern: Open3.capture2("...#{...}...")
 
+  - id: wbx-rb-kernel-open
+    languages: [ruby]
+    severity: ERROR
+    message: >
+      Kernel#open with a non-literal argument. A leading '|' makes it run a shell
+      command; with open-uri it is SSRF; otherwise path traversal. Classic Ruby footgun.
+    metadata:
+      vuln_class: command_injection
+      confidence: MEDIUM
+      cwe: "CWE-78"
+      exploitation: "location = '|cat /flag' executes a command via Kernel#open."
+    patterns:
+      - pattern-either:
+          - pattern: open($X)
+          - pattern: open($X) { |$IO| ... }
+          - pattern: open($X, ...)
+      - pattern-not: open("...")
+      - pattern-not: open("...") { |$IO| ... }
+      - pattern-not: open("...", ...)
+
   - id: wbx-rb-eval
     languages: [ruby]
     severity: ERROR

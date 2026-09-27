@@ -69,9 +69,12 @@ def enrich_and_rank(findings: list[Finding], surface: SurfaceMap) -> list[Findin
         signals: dict = {}
         score = 0.0
 
+        # class danger is the DOMINANT signal: in CTF the intended-bug class matters
+        # more than where it sits. Weighted x2 so contextual bonuses (route/entry)
+        # act as tiebreakers, not as things that lift a low-danger bug over an RCE.
         danger = _CLASS_DANGER.get(f.vuln_class, 2)
-        signals["class_danger"] = {"pts": danger, "why": f"{f.vuln_class} danger weight"}
-        score += danger
+        signals["class_danger"] = {"pts": danger * 2, "why": f"{f.vuln_class} danger weight (x2)"}
+        score += danger * 2
 
         sev = _SEVERITY_PTS.get(f.severity, 1)
         signals["severity"] = {"pts": sev, "why": f"severity={f.severity}"}

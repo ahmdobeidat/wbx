@@ -1,0 +1,6 @@
+name: js-ssrf-01
+description: req.query.url flows to http.get -> SSRF
+expect_findings:
+  - vuln_class: ssrf
+    file: source/proxy.js
+expect_top_class: ssrf

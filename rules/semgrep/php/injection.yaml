@@ -95,6 +95,24 @@ rules:
       - pattern: $DB->prepare(...)
       - pattern: pg_query(...)
 
+  - id: wbx-php-sql-string-concat
+    languages: [php]
+    severity: WARNING
+    message: >
+      A SQL string is built by concatenating a variable. If that variable is
+      user-influenced (even via another file/function) this is SQL injection.
+      Catches cross-function/cross-file cases that intra-procedural taint misses.
+    metadata:
+      vuln_class: php_sqli
+      confidence: MEDIUM
+      cwe: "CWE-89"
+      exploitation: "Count columns, UNION SELECT; use mixed-case uNiOn if a keyword filter exists."
+    patterns:
+      - pattern: $LIT . $X
+      - metavariable-regex:
+          metavariable: $LIT
+          regex: '(?i).*(select |insert |update |delete |from |where |like |union |order by).*'
+
   - id: wbx-php-eval
     mode: taint
     languages: [php]
