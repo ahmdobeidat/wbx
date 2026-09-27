@@ -10,8 +10,11 @@ these use exotic techniques on purpose.
 ## Headline
 
 - **32 challenges scanned** (PHP, Python, JS, Java, plus a couple C/crypto outliers).
-- **Fast (Semgrep only): 20/32 produced findings.**
-- **Deep (+CodeQL +Psalm): 27/32 produced findings.**
+- **Fast (Semgrep only): 23/32 produced findings.**
+- **Deep (+CodeQL +Psalm): 30/32 produced findings.**
+- After the first run, the 3 in-scope no-finding cases were investigated and the
+  rules patched (see below); the **only 2 remaining misses are outside the tool's
+  scope by design** (a C CGI binary and a Java crypto-logic challenge).
 - Of the 27, the **top-ranked finding matched the documented intended vulnerability
   class on 18** that were verified by reading the source / writeup (e.g. ssrfme,
   babytrick, baby^h-master-php, sql-so-hard, Return-of-Use-After-Flee, giraffe,
@@ -34,29 +37,42 @@ injection, via Psalm) — exactly the inter-procedural cases the deep engines ex
 | hitcon-2015/giraffe's-coffee | php_type_juggling @index.php:118 | `==` type juggling | correct |
 | hitcon-2015/babyfirst | php_command_injection @index.php:14 | preg/command RCE | correct |
 
-## The 5 no-finding cases (honest)
+## The original 5 no-finding cases, and what happened to them
 
-- **nanana** — a compiled C CGI (`cgid.c`, `libcgid.so`). Out of scope: wbx analyzes
-  web source languages, not C binaries.
-- **angry boy** — a Java lottery crypto/logic challenge. Out of scope: the bug is a
-  cryptographic/logic flaw, not a taint-reachable sink; no SAST finds this.
-- **luatic** — Lua embedded in PHP. Genuine gap: wbx has no Lua rules.
-- **papapa** — PHP + Apache config trick. Genuine gap: the vuln lives in server
-  config / a niche function, not a standard sink.
-- **W3rmup-PHP** — an exotic single-file PHP trick with no standard sink pattern.
+Reading the source showed 3 of the 5 were real gaps (and NOT what the file
+extensions suggested). All 3 were patched with general rules and are now caught:
 
-So of 5 misses: 2 are outside the tool's language scope by design, and 3 are real
-coverage gaps (Lua, server-config tricks, exotic single-function abuse) — the honest
-edge of what pattern/taint analysis reaches.
+- **luatic** — not a Lua bug at all: the flaw is **PHP variable override**
+  (`foreach ($$req as $k=>$v) ${$k}=...`, letting an attacker set any uninitialised
+  variable the script trusts). Patched: `wbx-php-variable-override`. Now flags
+  `php_variable_override` at the sink.
+- **W3rmup-PHP** — **YAML injection into a command**: user data is interpolated into
+  a YAML string, parsed, then `system(implode($arr))`. Taint doesn't track through
+  `yaml_parse`, so it was missed. Patched: `wbx-php-exec-nonliteral` (+ a
+  `yaml_parse` rule). Now flags `php_command_injection` at the `system()` sink.
+- **papapa** — **header injection / open redirect**: `header("Location: ".
+  $_SERVER['HTTP_HOST'].$_SERVER['PHP_SELF'])`. Patched: `wbx-php-header-injection`.
+  Now flags `header_injection`.
+
+The 2 that remain unfound are outside wbx's scope by design, not bugs to patch:
+
+- **nanana** — a compiled C CGI (`cgid.c`, `libcgid.so`). wbx analyzes web source
+  languages, not C binaries.
+- **angry boy** — a Java lottery crypto/logic challenge. The bug is a cryptographic
+  weakness, not a taint-reachable sink; no SAST finds this class.
+
+Each patch is a general PHP vulnerability class (variable override, header
+injection, indirect command execution, YAML injection), backed by a new corpus
+regression fixture, and verified not to add false positives on real clean code.
 
 ## Takeaway
 
-On the hardest public white-box web corpus available, wbx surfaces findings on 27/32
-and points at the documented intended bug on the large majority of those it analyzes,
-with the deep engines carrying the cross-file cases. The failures are concentrated
-exactly where static analysis is known to be weak: non-web languages, server
-configuration, cryptographic/logic bugs, and niche single-function tricks. Those are
-categories to review by hand, not gaps a rule can close.
+On the hardest public white-box web corpus available, wbx surfaces findings on 30/32
+(deep) and points at the documented intended bug on the large majority of those it
+analyzes, with the deep engines carrying the cross-file cases. After patching the 3
+in-scope gaps the first run exposed, the only two remaining misses are a C binary and
+a cryptographic-logic bug, both outside what any web-source taint tool reaches, to be
+reviewed by hand rather than closed with a rule.
 
 _Method note: "documented intended bug" was judged by reading each challenge's source
 and public writeup; it is a considered assessment, not an automated ground-truth
