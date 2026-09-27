@@ -124,9 +124,9 @@ def enrich_and_rank(findings: list[Finding], surface: SurfaceMap) -> list[Findin
             signals["tainted"] = {"pts": 4, "why": "resolved taint source -> reaches user input"}
             score += 4
 
-        # codeql proved a dataflow path
-        if f.engine == "codeql":
-            signals["codeql_path"] = {"pts": 3, "why": "codeql proved a dataflow path"}
+        # a deep engine (codeql / psalm) proved a source->sink dataflow path
+        if f.engine in ("codeql", "psalm"):
+            signals["dataflow_path"] = {"pts": 3, "why": f"{f.engine} proved a dataflow path"}
             score += 3
 
         # both engines flagged this bug -> strong corroboration
@@ -227,8 +227,9 @@ def merge_findings(findings: list[Finding]) -> list[Finding]:
             if (m.file == f.file and _family(m.vuln_class) == _family(f.vuln_class)
                     and abs(m.line - f.line) <= 3):
                 m.vuln_class = _more_specific(m.vuln_class, f.vuln_class)
-                if (f.engine == "codeql" and m.engine != "codeql") or (f.dataflow and not m.dataflow):
-                    m.engine = f.engine if f.engine == "codeql" else m.engine
+                deep = ("codeql", "psalm")
+                if (f.engine in deep and m.engine not in deep) or (f.dataflow and not m.dataflow):
+                    m.engine = f.engine if f.engine in deep else m.engine
                     m.confidence = f.confidence if f.confidence == "HIGH" else m.confidence
                     m.dataflow = f.dataflow or m.dataflow
                     m.source = f.source or m.source

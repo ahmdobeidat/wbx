@@ -39,6 +39,9 @@ VULN_CLASSES = {
     # Ruby-leaning
     "ruby_yaml_load",
     "mass_assignment",
+    # Logic / access-control (SAST cannot CONFIRM these -- surfaced as hints)
+    "idor",
+    "access_control",
     # Java-leaning
     "java_deserialization",
     # Cross-cutting
@@ -137,6 +140,11 @@ class ScanResult:
     surface: SurfaceMap
     findings: list[Finding] = field(default_factory=list)
     chains: list[Chain] = field(default_factory=list)
+    # logic / access-control leads that SAST cannot confirm; kept OUT of `findings`
+    # so the confident list stays trustworthy. Surfaced in a separate report section.
+    hints: list[Finding] = field(default_factory=list)
+    # non-fatal notices for the operator (e.g. rabbit-hole caution, engine skipped)
+    cautions: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -144,4 +152,6 @@ class ScanResult:
             "surface": self.surface.to_dict(),
             "findings": [f.to_dict() for f in self.findings],
             "chains": [c.to_dict() for c in self.chains],
+            "hints": [f.to_dict() for f in self.hints],
+            "cautions": self.cautions,
         }

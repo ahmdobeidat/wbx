@@ -71,3 +71,18 @@ def test_fixture(fixture: Path):
         assert forbidden not in classes, (
             f"{fixture.name}: false positive {forbidden} in benign fixture"
         )
+
+    # --- hints (logic/access-control leads, kept out of findings) ---
+    hint_classes = {h.vuln_class for h in result.hints}
+    for want in exp.get("expect_hints", []):
+        assert want in hint_classes, (
+            f"{fixture.name}: expected hint {want}, got hints {hint_classes}"
+        )
+        # a hint must NOT leak into the confident findings list
+        assert want not in classes, (
+            f"{fixture.name}: hint class {want} leaked into confident findings"
+        )
+
+    # --- rabbit-hole / reachability caution ---
+    if exp.get("expect_caution"):
+        assert result.cautions, f"{fixture.name}: expected a caution, got none"

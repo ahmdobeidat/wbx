@@ -1,0 +1,6 @@
+name: reachability-caution-01
+description: high-impact decoy in an unreachable file must trigger a rabbit-hole caution
+expect_findings:
+  - vuln_class: sql_injection
+    file: source/index.py
+expect_caution: true

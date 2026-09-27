@@ -1,0 +1,4 @@
+name: idor-hint-01
+description: object fetched by user-supplied id without ownership check -> IDOR (hint, not a confident finding)
+expect_hints: [idor]
+expect_top_class: null

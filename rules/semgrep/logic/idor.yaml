@@ -1,0 +1,51 @@
+rules:
+  - id: wbx-py-idor
+    languages: [python]
+    severity: INFO
+    message: >
+      A record is fetched using a user-supplied identifier with no visible ownership
+      or session check at the call site. Possible IDOR / broken object-level
+      authorization. SAST cannot confirm authorization -- verify the handler enforces
+      that the current user owns this object.
+    metadata:
+      vuln_class: idor
+      confidence: LOW
+      hint: true
+      cwe: "CWE-639"
+      exploitation: "Change the id to another user's object; if it returns, it's IDOR."
+    patterns:
+      - pattern-either:
+          - pattern: $M.query.get($ARG)
+          - pattern: $M.objects.get(id=$ARG)
+          - pattern: $M.objects.get(pk=$ARG)
+          - pattern: $M.objects.filter(id=$ARG)
+      - metavariable-pattern:
+          metavariable: $ARG
+          patterns:
+            - pattern-either:
+                - pattern: request.args.get(...)
+                - pattern: request.form.get(...)
+                - pattern: request.values.get(...)
+                - pattern: request.args[...]
+                - pattern: request.view_args[...]
+
+  - id: wbx-js-idor
+    languages: [javascript, typescript]
+    severity: INFO
+    message: >
+      A record is fetched by a user-supplied identifier with no visible ownership
+      check. Possible IDOR / broken object-level authorization. SAST cannot confirm
+      authorization -- verify the handler checks the object belongs to req.user.
+    metadata:
+      vuln_class: idor
+      confidence: LOW
+      hint: true
+      cwe: "CWE-639"
+      exploitation: "Swap the id for another user's; if it returns, it's IDOR."
+    patterns:
+      - pattern-either:
+          - pattern: $M.findById(req.params.$X)
+          - pattern: $M.findById(req.query.$X)
+          - pattern: $M.findByPk(req.params.$X)
+          - pattern: "$M.findOne({_id: req.params.$X})"
+          - pattern: "$M.findOne({id: req.params.$X})"

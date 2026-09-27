@@ -1,0 +1,4 @@
+name: missing-auth-01
+description: admin routes with no auth/session guard -> broken access control (hint)
+expect_hints: [access_control]
+expect_top_class: null

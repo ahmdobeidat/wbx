@@ -105,7 +105,11 @@ def _to_finding(result: dict[str, Any], root: Path) -> Finding:
         sink=sink,
         dataflow=dataflow,
         exploitation_note=meta.get("exploitation", "") or "",
-        metadata={"references": meta.get("references", []), "cwe": meta.get("cwe", "")},
+        metadata={
+            "references": meta.get("references", []),
+            "cwe": meta.get("cwe", ""),
+            "hint": bool(meta.get("hint", False)),
+        },
     )
 
 

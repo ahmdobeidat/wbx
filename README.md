@@ -17,22 +17,35 @@ source tree -> Ingest -> Scan (Semgrep + CodeQL) -> Score -> Chain -> Report + S
 - **Ingest** fingerprints languages/frameworks, maps routes/entrypoints, and finds
   the CTF tells (flag strings, `/flag` references, hardcoded secrets).
 - **Scan** runs Semgrep CTF rulepacks (fast, all 5 languages) and, with `--deep`,
-  CodeQL for inter-procedural taint (Python / JS / Ruby / Java; **not PHP** which
-  CodeQL cannot analyze, so PHP is Semgrep-only).
-- **Score** ranks every finding by explainable CTF signals (reaches user input,
-  on a route, near the flag/secret, sink danger). Top of the list = start here.
+  inter-procedural taint: **CodeQL** for Python/JS/Ruby/Java and **Psalm
+  `--taint-analysis`** for PHP (CodeQL cannot analyze PHP, so Psalm fills the
+  cross-file PHP gap).
+- **Score** ranks findings by an impact-tier model (RCE > injection/auth >
+  disclosure > low) with evidence and reachability ordering within a tier. Top of
+  the list = start here, and a **rabbit-hole caution** fires when the top finding
+  sits in code no route reaches (decoy robustness).
 - **Chain** matches findings against a library of known CTF escalations
   (`LFI+upload=RCE`, `SQLi->secret->auth`, `deserialization=RCE`, ...).
+- **Hints** surface logic / access-control leads (IDOR, missing-auth) in a
+  SEPARATE "manual-review" section, never mixed with confident findings, because
+  static analysis cannot decide authorization.
 - **Report** prints a terminal summary and writes `report.md` + `report.json`,
   plus runnable PoC scaffolds under `scaffolds/`.
+- **Verify** (`wbx verify <url>`) is a separate, live step: nuclei against the
+  authorized challenge instance to confirm known-CVE / exposure, seeded by the
+  frameworks the static scan detected. `scan` itself never touches the network.
 
 ## Usage
 
 ```bash
 wbx scan ./challenge                 # fast Semgrep pass, terminal report
-wbx scan ./challenge --deep          # add CodeQL deep taint (slower)
+wbx scan ./challenge --deep          # add CodeQL (py/js/rb/java) + Psalm (php) taint
 wbx scan ./challenge --format md     # markdown to stdout
 wbx scan ./challenge --out ./results # choose output dir
+
+# live confirmation against the AUTHORIZED challenge instance (DAST, not offline):
+wbx verify http://TARGET:PORT --report ./challenge-wbx/report.json
+wbx verify http://TARGET:PORT --tags laravel cve --severity critical high
 ```
 
 Output (default `<path>-wbx/`): `report.md`, `report.json`, `scaffolds/*.py`.

@@ -31,6 +31,12 @@ def render_markdown(result: ScanResult) -> str:
     lines.append(f"- **Flag tells:** {len(s.flag_hits)}  |  **Secret tells:** {len(s.secret_hits)}")
     lines.append("")
 
+    if result.cautions:
+        lines.append("## Cautions\n")
+        for c in result.cautions:
+            lines.append(f"- {c}")
+        lines.append("")
+
     if result.chains:
         lines.append("## Candidate chains (start here)\n")
         for i, c in enumerate(result.chains, 1):
@@ -61,6 +67,16 @@ def render_markdown(result: ScanResult) -> str:
         if f.snippet:
             lines.append(f"\n```\n{f.snippet}\n```")
         lines.append("")
+
+    if result.hints:
+        lines.append("## Manual-review leads (SAST cannot confirm)\n")
+        lines.append("_Access-control / logic bugs (IDOR, missing auth). Static analysis "
+                     "cannot decide authorization; verify these by hand._\n")
+        for i, f in enumerate(result.hints, 1):
+            lines.append(f"{i}. **{f.vuln_class}** — `{f.location}` ({f.engine})")
+            if f.message:
+                lines.append(f"   - {f.message}")
+        lines.append("")
     return "\n".join(lines)
 
 
@@ -86,6 +102,10 @@ def render_terminal(result: ScanResult, top: int = 15) -> str:
     )
     console.print(Panel(header, title="wbx scan", border_style="cyan"))
 
+    if result.cautions:
+        for c in result.cautions:
+            console.print(f"[yellow]! caution:[/yellow] {c}")
+
     if result.chains:
         console.print("\n[bold red]>> Candidate chains (start here)[/bold red]")
         for i, c in enumerate(result.chains, 1):
@@ -110,6 +130,12 @@ def render_terminal(result: ScanResult, top: int = 15) -> str:
     console.print(table)
     if len(result.findings) > top:
         console.print(f"[dim]... {len(result.findings) - top} more (see markdown/json report)[/dim]")
+
+    if result.hints:
+        console.print("\n[bold yellow]Manual-review leads[/bold yellow] "
+                      "[dim](logic/access-control; SAST cannot confirm)[/dim]")
+        for f in result.hints[:10]:
+            console.print(f"  - {f.vuln_class} @ {f.location}")
     return buf.getvalue()
 
 
