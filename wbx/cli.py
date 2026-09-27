@@ -79,9 +79,13 @@ def _cmd_verify(args: argparse.Namespace) -> int:
             print(f"warning: could not read report {args.report}: {e}", file=sys.stderr)
 
     severity = list(args.severity) if args.severity else None
+    templates = args.templates
+    if args.wbx_templates:
+        templates = str(Path(__file__).resolve().parents[1] / "rules" / "nuclei")
     print(f"running nuclei against {args.url} "
-          f"(tags={tags or 'all'}, severity={severity or 'all'})...", file=sys.stderr)
-    hits = run_nuclei(args.url, templates=args.templates, tags=tags or None,
+          f"(templates={templates or 'default'}, tags={tags or 'all'}, "
+          f"severity={severity or 'all'})...", file=sys.stderr)
+    hits = run_nuclei(args.url, templates=templates, tags=tags or None,
                       severity=severity, timeout=args.timeout)
 
     if args.format == "json":
@@ -117,6 +121,8 @@ def build_parser() -> argparse.ArgumentParser:
     v.add_argument("--tags", nargs="*", help="nuclei tags to focus templates (e.g. laravel cve)")
     v.add_argument("--severity", nargs="*", help="filter by severity (critical high medium low info)")
     v.add_argument("--templates", help="path to a nuclei templates dir/file")
+    v.add_argument("--wbx-templates", action="store_true",
+                   help="use wbx's bundled confirmation templates (rules/nuclei/)")
     v.add_argument("--format", choices=["terminal", "json"], default="terminal")
     v.add_argument("--timeout", type=int, default=600)
     v.set_defaults(func=_cmd_verify)

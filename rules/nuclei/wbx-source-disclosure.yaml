@@ -1,0 +1,44 @@
+id: wbx-source-disclosure
+
+info:
+  name: Source / config / VCS disclosure
+  author: wbx
+  severity: high
+  description: >
+    Exposed version-control, environment, dependency, or backup files that leak
+    source code, secrets, or dependency versions. In a white-box review these
+    confirm on the live target what the static scan saw in the tree.
+  tags: wbx,exposure,disclosure,config
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/.git/config"
+      - "{{BaseURL}}/.git/HEAD"
+      - "{{BaseURL}}/.env"
+      - "{{BaseURL}}/.env.local"
+      - "{{BaseURL}}/composer.json"
+      - "{{BaseURL}}/package.json"
+      - "{{BaseURL}}/.svn/entries"
+      - "{{BaseURL}}/config.php.bak"
+      - "{{BaseURL}}/index.php.bak"
+      - "{{BaseURL}}/.DS_Store"
+      - "{{BaseURL}}/WEB-INF/web.xml"
+    stop-at-first-match: false
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: body
+        condition: or
+        words:
+          - "[core]"
+          - "ref: refs/"
+          - "DB_PASSWORD"
+          - "APP_KEY"
+          - '"dependencies"'
+          - '"require"'
+          - "<web-app"
+          - "Bud1"

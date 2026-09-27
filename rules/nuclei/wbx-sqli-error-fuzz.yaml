@@ -1,0 +1,58 @@
+id: wbx-sqli-error-fuzz
+
+info:
+  name: SQL Injection - error based (fuzzing)
+  author: wbx
+  severity: high
+  description: >
+    Fuzzes query parameters with a quote/syntax-breaking payload and confirms a
+    database error signature in the response. Confirms live a SQLi the static scan
+    flags (error-based; blind/UNION need manual follow-up with the scaffold).
+  tags: wbx,sqli,dast,fuzz
+
+http:
+  - pre-condition:
+      - type: dsl
+        dsl:
+          - "true"
+    payloads:
+      sqli:
+        - "'"
+        - "\""
+        - "')"
+        - "1'\"`"
+    fuzzing:
+      - part: query
+        type: postfix
+        mode: single
+        fuzz:
+          - "{{sqli}}"
+    matchers-condition: or
+    matchers:
+      - type: word
+        part: body
+        name: mysql
+        condition: or
+        words:
+          - "You have an error in your SQL syntax"
+          - "supplied argument is not a valid MySQL"
+          - "mysql_fetch"
+          - "MySqlException"
+      - type: word
+        part: body
+        name: postgres
+        condition: or
+        words:
+          - "PG::SyntaxError"
+          - "unterminated quoted string"
+          - "PSQLException"
+      - type: word
+        part: body
+        name: sqlite-mssql-oracle
+        condition: or
+        words:
+          - "SQLite3::SQLException"
+          - "SQLITE_ERROR"
+          - "Unclosed quotation mark after the character string"
+          - "ORA-00933"
+          - "quoted string not properly terminated"

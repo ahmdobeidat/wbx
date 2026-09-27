@@ -1,0 +1,40 @@
+id: wbx-lfi-fuzz
+
+info:
+  name: Local File Inclusion / Path Traversal (fuzzing)
+  author: wbx
+  severity: high
+  description: >
+    Fuzzes query parameters with traversal and PHP-wrapper payloads and confirms
+    file read (/etc/passwd) or base64 source disclosure. Confirms live an LFI /
+    path traversal the static scan flags.
+  tags: wbx,lfi,traversal,dast,fuzz
+
+http:
+  - pre-condition:
+      - type: dsl
+        dsl:
+          - "true"
+    payloads:
+      lfi:
+        - "../../../../../../etc/passwd"
+        - "....//....//....//....//etc/passwd"
+        - "/etc/passwd"
+        - "php://filter/convert.base64-encode/resource=index"
+    fuzzing:
+      - part: query
+        type: replace
+        mode: single
+        fuzz:
+          - "{{lfi}}"
+    matchers-condition: or
+    matchers:
+      - type: regex
+        part: body
+        regex:
+          - "root:.*:0:0:"
+      - type: regex
+        part: body
+        name: base64-source
+        regex:
+          - "PD9waHA"

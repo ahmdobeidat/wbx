@@ -1,0 +1,37 @@
+id: wbx-ssti-fuzz
+
+info:
+  name: Server-Side Template Injection (fuzzing)
+  author: wbx
+  severity: critical
+  description: >
+    Fuzzes query parameters with template-engine math expressions and confirms
+    evaluation (49) in the response. Confirms live an SSTI the static scan flags.
+  tags: wbx,ssti,dast,fuzz
+
+http:
+  - pre-condition:
+      - type: dsl
+        dsl:
+          - "true"
+    payloads:
+      ssti:
+        - "wbx{{7*7}}wbx"
+        - "wbx${7*7}wbx"
+        - "wbx<%= 7*7 %>wbx"
+        - "wbx#{7*7}wbx"
+    fuzzing:
+      - part: query
+        type: postfix
+        mode: single
+        fuzz:
+          - "{{ssti}}"
+    matchers-condition: and
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "wbx49wbx"
+      - type: status
+        status:
+          - 200

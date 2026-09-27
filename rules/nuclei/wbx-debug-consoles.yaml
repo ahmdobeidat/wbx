@@ -1,0 +1,49 @@
+id: wbx-debug-consoles
+
+info:
+  name: Framework debug interface exposed
+  author: wbx
+  severity: high
+  description: >
+    Development debug consoles / profilers left enabled in a reachable environment.
+    Several allow code execution or leak configuration and source. Confirms the
+    kind of exposure a white-box review flags when debug flags are on in source.
+  tags: wbx,debug,exposure,rce
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/console"
+      - "{{BaseURL}}/_profiler"
+      - "{{BaseURL}}/_profiler/phpinfo"
+      - "{{BaseURL}}/__debug__/"
+      - "{{BaseURL}}/actuator"
+      - "{{BaseURL}}/actuator/env"
+      - "{{BaseURL}}/_ignition/health-check"
+    stop-at-first-match: false
+    matchers-condition: or
+    matchers:
+      - type: word
+        part: body
+        name: werkzeug
+        words:
+          - "Werkzeug Debugger"
+          - "The console is locked"
+      - type: word
+        part: body
+        name: symfony-profiler
+        words:
+          - "Symfony Profiler"
+          - "sf-toolbar"
+      - type: word
+        part: body
+        name: spring-actuator
+        words:
+          - '"activeProfiles"'
+          - '"propertySources"'
+      - type: word
+        part: body
+        name: laravel-ignition
+        words:
+          - '"can_execute_commands"'
+          - "ignition"
