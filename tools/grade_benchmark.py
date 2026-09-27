@@ -3,7 +3,7 @@
 against the authors' ANSWER.yaml keys. No eyeballing -- the verdict is arithmetic.
 
 Usage:
-    python tools/grade_benchmark.py /home/l0mb4rd/Projects/wbx-benchmark [--deep]
+    python tools/grade_benchmark.py ./wbx-benchmark [--deep]
 
 For each challenge it reports:
   - recall:  did wbx surface the intended bug's class at the intended file?

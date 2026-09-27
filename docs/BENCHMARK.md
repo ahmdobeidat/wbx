@@ -58,7 +58,7 @@ left at rank 2 on purpose because forcing it to #1 would require special-casing.
    danger the dominant signal (x2) so contextual bonuses act as tiebreakers.
 
 Every fix is a general improvement (verified: 0 false positives on the clean
-habes-chatbot after all changes) and is locked by a new corpus regression fixture.
+a clean real-world app after all changes) and is locked by a new corpus regression fixture.
 
 ## Honest limitations the benchmark confirmed
 
