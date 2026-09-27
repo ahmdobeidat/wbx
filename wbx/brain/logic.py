@@ -44,44 +44,64 @@ def _read(path: Path) -> str:
         return ""
 
 
+def _is_sensitive(route: dict) -> bool:
+    return (any(s in route["path"].lower() for s in _SENSITIVE)
+            or route["method"] not in ("GET", "ANY", "USE"))
+
+
 def find_access_control_hints(root: str | Path, surface: SurfaceMap) -> list[Finding]:
+    """Flag sensitive routes with no visible auth guard in their own window.
+
+    Route-level (not file-level): a file can guard some routes and leave one open,
+    which is the common CTF broken-access-control shape. For each route we look at
+    a window around its declaration (a few lines above for decorators/middleware,
+    down to the next route) for any auth/session token; absence on a sensitive
+    route is a lead.
+    """
     root = Path(root)
     hints: list[Finding] = []
-    # group routes by handler file
     by_file: dict[str, list[dict]] = {}
     for rt in surface.routes:
         by_file.setdefault(rt["file"], []).append(rt)
 
     for rel_file, routes in by_file.items():
-        text = _read(root / rel_file).lower()
+        text = _read(root / rel_file)
         if not text:
             continue
-        if any(tok in text for tok in _AUTH_TOKENS):
-            continue  # some guard exists; don't cry wolf
-        # no auth token anywhere in the file -> every route here is a lead
-        sensitive = [r for r in routes
-                     if any(s in r["path"].lower() for s in _SENSITIVE)
-                     or r["method"] not in ("GET", "ANY", "USE")]
-        flagged = sensitive or routes  # prefer sensitive; else flag all
-        first = flagged[0]
-        paths = ", ".join(f"{r['method']} {r['path']}" for r in flagged[:6])
-        hints.append(Finding(
-            rule_id="wbx-logic-missing-auth",
-            engine="wbx-logic",
-            lang=lang_of(rel_file) or "",
-            vuln_class="access_control",
-            file=rel_file,
-            line=first.get("line", 1),
-            message=(
-                f"Route handler file shows no auth/session/authorization guard; "
-                f"routes may be reachable unauthenticated: {paths}. "
-                f"SAST cannot confirm -- verify access control by hand."
-            ),
-            severity="INFO",
-            confidence="LOW",
-            metadata={"hint": True, "cwe": "CWE-862", "routes": [r["path"] for r in flagged]},
-            exploitation_note="Request the route with no session/token; if it works, it's broken access control.",
-        ))
+        lines = text.splitlines()
+        routes = sorted(routes, key=lambda r: r.get("line", 0))
+        route_lines = [r.get("line", 1) for r in routes]
+
+        for idx, rt in enumerate(routes):
+            if not _is_sensitive(rt):
+                continue
+            rl = rt.get("line", 1)                              # 1-based
+            prev_rl = route_lines[idx - 1] if idx > 0 else 0
+            next_rl = route_lines[idx + 1] if idx + 1 < len(route_lines) else len(lines) + 1
+            # a few lines above for decorators (not into the previous route), down to
+            # the next route (not past it, so a sibling route's guard never leaks in)
+            start = max(prev_rl + 1, rl - 3)
+            end = min(next_rl - 1, rl + 15)
+            window = "\n".join(lines[start - 1:end]).lower()
+            if any(tok in window for tok in _AUTH_TOKENS):
+                continue  # this route has a guard nearby
+            hints.append(Finding(
+                rule_id="wbx-logic-missing-auth",
+                engine="wbx-logic",
+                lang=lang_of(rel_file) or "",
+                vuln_class="access_control",
+                file=rel_file,
+                line=rt.get("line", 1),
+                message=(
+                    f"Sensitive route {rt['method']} {rt['path']} shows no auth/session "
+                    f"guard in its handler while other routes may be guarded. Possible "
+                    f"broken access control. SAST cannot confirm -- verify by hand."
+                ),
+                severity="INFO",
+                confidence="LOW",
+                metadata={"hint": True, "cwe": "CWE-862", "route": rt["path"]},
+                exploitation_note="Request the route with no session/token; if it works, it's broken access control.",
+            ))
     return hints
 
 

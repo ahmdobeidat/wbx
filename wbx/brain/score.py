@@ -21,6 +21,7 @@ _CLASS_DANGER = {
     "node_command_injection": 10,
     "php_command_injection": 10,
     "python_eval_exec": 10,
+    "code_injection": 10,
     "php_eval": 10,
     "php_preg_replace_eval": 10,
     "ssti": 9,
@@ -59,6 +60,7 @@ _TIER = {
     "python_pickle": 1, "ruby_yaml_load": 1, "python_yaml_load": 1,
     "command_injection": 1, "node_command_injection": 1, "php_command_injection": 1,
     "python_eval_exec": 1, "php_eval": 1, "php_preg_replace_eval": 1, "ssti": 1,
+    "code_injection": 1,
     # --- Tier 2: injection / auth-logic that reaches the flag directly ---
     # php_lfi is here (not Tier 3): PHP LFI reads the flag directly and commonly
     # escalates to RCE via wrappers/log poisoning, unlike generic path traversal.
@@ -182,7 +184,7 @@ _FAMILIES = {
         "php_object_injection", "insecure_deserialization", "python_pickle",
         "python_yaml_load", "ruby_yaml_load", "java_deserialization",
     },
-    "code_exec": {"python_eval_exec", "php_eval"},
+    "code_exec": {"python_eval_exec", "php_eval", "code_injection"},
     "cmd_exec": {"command_injection", "node_command_injection", "php_command_injection"},
     "sqli": {"sql_injection", "php_sqli"},
     "file_read": {"php_lfi", "php_rfi", "path_traversal"},
@@ -200,7 +202,7 @@ def _family(vuln_class: str) -> str:
 # the scaffold generator picks the right PoC template.
 _GENERIC = {
     "insecure_deserialization", "command_injection", "sql_injection",
-    "path_traversal", "python_eval_exec",
+    "path_traversal", "code_injection",
 }
 
 

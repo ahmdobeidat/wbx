@@ -13,6 +13,25 @@ rules:
           - pattern: (ObjectInputStream $O).readObject()
           - pattern: new ObjectInputStream(...).readObject()
 
+  - id: wbx-java-spel-injection
+    languages: [java]
+    severity: ERROR
+    message: >
+      A SpEL expression is parsed from a non-literal (often request data). Spring
+      Expression Language evaluation on attacker input is RCE via T(java.lang.Runtime).
+    metadata:
+      vuln_class: code_injection
+      confidence: HIGH
+      cwe: "CWE-917"
+      exploitation: "T(java.lang.Runtime).getRuntime().exec('...') inside the expression."
+    patterns:
+      - pattern-either:
+          - pattern: $P.parseExpression($X)
+          - pattern: new SpelExpressionParser().parseExpression($X)
+          - pattern: $P.parseRaw($X)
+      - pattern-not: $P.parseExpression("...")
+      - pattern-not: new SpelExpressionParser().parseExpression("...")
+
   - id: wbx-java-command-injection
     languages: [java]
     severity: ERROR

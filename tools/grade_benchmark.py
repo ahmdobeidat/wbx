@@ -31,7 +31,7 @@ VOCAB_MAP: dict[str, set[str]] = {
     "SQLi": {"sql_injection", "php_sqli"},
     "NoSQLi": {"nosql_injection"},
     "command_injection": {"command_injection", "node_command_injection", "php_command_injection"},
-    "code_injection": {"python_eval_exec", "php_eval"},
+    "code_injection": {"code_injection", "python_eval_exec", "php_eval"},
     "LFI": {"php_lfi", "path_traversal", "php_rfi"},
     "path_traversal": {"path_traversal", "php_lfi"},
     "RFI": {"php_rfi", "php_lfi"},
@@ -43,12 +43,14 @@ VOCAB_MAP: dict[str, set[str]] = {
     "jwt_none": {"jwt_none_alg"},
     "type_juggling": {"php_type_juggling"},
     "mass_assignment": {"mass_assignment"},
+    "idor": {"idor"},
+    "access_control": {"access_control", "idor"},
     "SSRF": {"ssrf"},
     "XXE": {"xxe"},
     "open_redirect": {"open_redirect"},
     "XSS": {"xss"},
     "file_upload": {"file_upload"},
-    "auth_bypass": {"auth_bypass", "php_type_juggling", "jwt_none_alg"},
+    "auth_bypass": {"auth_bypass", "php_type_juggling", "jwt_none_alg", "access_control"},
     "hardcoded_secret": {"hardcoded_secret"},
 }
 
@@ -118,6 +120,9 @@ def grade_one(chal_dir: Path, deep: bool) -> dict:
                 chain_relevant = True
                 break
 
+    # logic/access-control bugs are surfaced as HINTS, not confident findings.
+    hint_hit = any(h.vuln_class in want_classes for h in result.hints)
+
     if hit_rank == 1:
         verdict = "TOP1"
     elif hit_rank and hit_rank <= 3:
@@ -126,8 +131,15 @@ def grade_one(chal_dir: Path, deep: bool) -> dict:
         verdict = "LOW"
     elif hit_class_only:
         verdict = "WRONG_FILE"
+    elif hint_hit:
+        verdict = "HINT"   # correctly caught, in the manual-review channel
     else:
         verdict = "MISS"
+
+    # for decoy-inversion challenges: did the rabbit-hole caution fire?
+    has_unreachable_decoy = any(
+        d.get("reachable_from_route") is False for d in (ans.get("decoys", []) or [])
+    )
 
     return {
         "name": ans["name"],
@@ -140,6 +152,8 @@ def grade_one(chal_dir: Path, deep: bool) -> dict:
         "total_findings": len(findings),
         "decoy_above": decoy_above,
         "chain_relevant": chain_relevant,
+        "caution_fired": bool(result.cautions),
+        "expects_caution": has_unreachable_decoy,
         "top3": [(f.vuln_class, f.file + ":" + str(f.line), f.score) for f in findings[:3]],
     }
 
@@ -164,17 +178,22 @@ def main() -> int:
 
     mode = "DEEP (semgrep+codeql)" if args.deep else "FAST (semgrep only)"
     print(f"\n=== wbx benchmark scorecard [{mode}] ===\n")
-    hdr = f"{'challenge':<22} {'lang':<6} {'diff':<7} {'intended':<20} {'verdict':<11} {'rank':<5} {'decoy!':<7} {'chain':<6}"
+    hdr = f"{'challenge':<24} {'lang':<6} {'diff':<7} {'intended':<18} {'verdict':<11} {'rank':<5} {'caution':<8} {'chain':<6}"
     print(hdr)
     print("-" * len(hdr))
     for r in rows:
         rank = str(r["rank"]) if r["rank"] else "-"
-        print(f"{r['name']:<22} {r['language']:<6} {r['difficulty']:<7} {r['intended']:<20} "
-              f"{r['verdict']:<11} {rank:<5} {'YES' if r['decoy_above'] else '-':<7} "
+        # caution column: OK if fired-when-expected or not-fired-when-not-expected
+        if r.get("expects_caution"):
+            caution = "FIRED" if r.get("caution_fired") else "MISSING!"
+        else:
+            caution = "-"
+        print(f"{r['name']:<24} {r['language']:<6} {r['difficulty']:<7} {r['intended']:<18} "
+              f"{r['verdict']:<11} {rank:<5} {caution:<8} "
               f"{'yes' if r['chain_relevant'] else '-':<6}")
 
     n = len(rows)
-    found = sum(1 for r in rows if r["verdict"] in {"TOP1", "TOP3", "LOW", "WRONG_FILE"})
+    found = sum(1 for r in rows if r["verdict"] in {"TOP1", "TOP3", "LOW", "WRONG_FILE", "HINT"})
     top1 = sum(1 for r in rows if r["verdict"] == "TOP1")
     top3 = sum(1 for r in rows if r["verdict"] in {"TOP1", "TOP3"})
     misses = [r for r in rows if r["verdict"] == "MISS"]
@@ -182,10 +201,20 @@ def main() -> int:
     scan_errors = [r for r in rows if r["verdict"] == "SCAN_ERROR"]
     decoy_probs = [r for r in rows if r["decoy_above"]]
 
-    print(f"\nrecall (found intended bug):     {found}/{n}")
+    hints = sum(1 for r in rows if r["verdict"] == "HINT")
+    inversions = [r for r in rows if r.get("expects_caution")]
+    # inversion handled = the real (reachable) bug surfaced in top-3, OR a rabbit-hole
+    # caution pointed away from the decoy. Either way the operator is not misled.
+    inv_ok = sum(1 for r in inversions
+                 if r["verdict"] in {"TOP1", "TOP3"} or r.get("caution_fired"))
+
+    print(f"\nrecall (found intended bug):     {found}/{n}   (of which {hints} via hints channel)")
     print(f"precision (intended ranked #1):  {top1}/{n}")
     print(f"precision (intended in top 3):   {top3}/{n}")
     print(f"chain relevant fired:            {sum(1 for r in rows if r['chain_relevant'])}/{n}")
+    if inversions:
+        print(f"decoy-inversion handled:         {inv_ok}/{len(inversions)} "
+              f"(intended surfaced or rabbit-hole caution)")
 
     if scan_errors:
         print("\nSCAN ERRORS (scan failed, NOT a miss -- investigate):")

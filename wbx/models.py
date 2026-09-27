@@ -26,6 +26,7 @@ VULN_CLASSES = {
     "ssti",
     "python_pickle",
     "python_eval_exec",
+    "code_injection",
     "python_yaml_load",
     "path_traversal",
     "ssrf",

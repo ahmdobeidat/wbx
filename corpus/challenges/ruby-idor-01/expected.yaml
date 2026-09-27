@@ -1,0 +1,4 @@
+name: ruby-idor-01
+description: Ruby record fetched by raw params[:id] with no ownership check -> IDOR (hint)
+expect_hints: [idor]
+expect_top_class: null

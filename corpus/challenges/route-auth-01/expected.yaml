@@ -1,0 +1,4 @@
+name: route-auth-01
+description: one admin route guarded, sibling /admin/backup unguarded -> route-level missing auth (hint)
+expect_hints: [access_control]
+expect_top_class: null

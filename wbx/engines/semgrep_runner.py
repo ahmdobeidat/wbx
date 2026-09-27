@@ -143,36 +143,56 @@ def run_semgrep(
         "--disable-version-check",
         "--no-git-ignore",
         "--quiet",
+        # --jobs 1: semgrep's multiprocessing intermittently returns an EMPTY result
+        # set (exit 0, valid JSON, no findings) on the first run of a tree -- a race
+        # that reads as a clean scan and silently drops real findings. Single-worker
+        # is deterministic; on CTF-sized source the cost is negligible. Reliability
+        # over speed is the whole point here.
+        "--jobs", "1",
     ]
     for d in sorted(SKIP_DIRS):
         cmd += ["--exclude", d]
     cmd.append(str(root))
 
-    last_err = "unknown"
-    for attempt in range(retries + 1):
+    def _attempt() -> list[Finding] | None:
+        """One scan. Returns findings on success, None on a failure worth retrying."""
+        nonlocal last_err
         try:
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
         except subprocess.TimeoutExpired:
             last_err = f"timeout after {timeout}s"
-            continue
+            return None
         except OSError as e:
             last_err = f"could not launch semgrep: {e}"
-            continue
-
+            return None
         if proc.returncode not in (0, 1):
             last_err = f"exit {proc.returncode}; stderr: {proc.stderr.strip()[:300]}"
-            continue
+            return None
         if not proc.stdout.strip():
             last_err = f"empty stdout (exit {proc.returncode}); stderr: {proc.stderr.strip()[:300]}"
-            continue
+            return None
         try:
             data = json.loads(proc.stdout)
         except json.JSONDecodeError as e:
             last_err = f"unparseable JSON: {e}"
-            continue
-
+            return None
         return [_to_finding(r, root) for r in data.get("results", [])]
 
-    raise SemgrepError(
-        f"semgrep scan of {root} failed after {retries + 1} attempts: {last_err}"
-    )
+    last_err = "unknown"
+    result: list[Finding] | None = None
+    for _ in range(retries + 1):
+        result = _attempt()
+        if result is not None:
+            break
+    if result is None:
+        raise SemgrepError(
+            f"semgrep scan of {root} failed after {retries + 1} attempts: {last_err}"
+        )
+
+    # Belt-and-suspenders: an EMPTY result is exactly what the race produces. Confirm
+    # it with one more scan; if the re-scan finds anything, the first was a flake.
+    if not result:
+        confirm = _attempt()
+        if confirm:
+            return confirm
+    return result

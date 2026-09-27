@@ -1,0 +1,6 @@
+name: java-spel-01
+description: Spring SpEL parseExpression on non-literal -> code injection (RCE)
+expect_findings:
+  - vuln_class: code_injection
+    file: source/RuleEngine.java
+expect_top_class: code_injection
