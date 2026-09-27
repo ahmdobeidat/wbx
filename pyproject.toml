@@ -1,7 +1,7 @@
 [project]
 name = "wbx"
 version = "0.1.0"
-description = "Deterministic offline static-analysis for white-box web CTF source review"
+description = "White-box web application security testing: static analysis for vulnerabilities and exploit chains"
 requires-python = ">=3.11"
 dependencies = [
     "pyyaml>=6.0",
