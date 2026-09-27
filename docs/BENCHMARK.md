@@ -87,3 +87,53 @@ Fixed:
   same tree always produces the same ranked report.
 - Verified: the fast scorecard is stable across repeated runs (7/8 recall,
   no flaky misses).
+
+---
+
+## Round 2: expanded benchmark + the four-weakness fixes
+
+After the first round, adversarial review named four weaknesses. Each was fixed
+with research, then validated on an EXPANDED benchmark: a second, independently
+blind batch of 6 challenges (frameworks Django, FastAPI/plain, Koa, Sinatra,
+Spring Boot, plain PHP) across new categories -- decoy-inversion and
+access-control -- for 14 challenges total from two separate blind authors.
+
+### Results on all 14 (DEEP)
+
+- **recall: 14/14** -- every intended bug surfaced (12 in the ranked findings, 2
+  in the hints channel).
+- **ranked findings: 12/12 in top-3, 10/12 top-1.**
+- **access-control (2/2): caught in the hints channel** (b2-authz-billing
+  auth_bypass, b2-idor-clinic idor) -- correctly NOT ranked as confident findings.
+- **decoy-inversion (2 real): intended reachable bug ranked #1 on both**, over the
+  juicy dead-code decoy.
+
+### The four fixes
+
+1. **Bigger/blinder benchmark.** 8 -> 14 challenges, two independent blind authors,
+   6 frameworks, plus inversion and access-control categories that the first batch
+   never exercised.
+2. **PHP cross-file taint.** Added Psalm `--taint-analysis` as the PHP deep engine
+   (CodeQL cannot analyze PHP). Proven: artgallery's cross-file object injection is
+   now a real corroborated data-flow path, not a heuristic guess.
+3. **Decoy robustness.** Impact-tier scoring + reachability: a finding in code no
+   route reaches earns no reachability bonus and, if it tops the list, triggers a
+   rabbit-hole caution pointing to a reachable alternative. We never hide the juicy
+   bug; we flag that it may be unreachable.
+4. **Logic / access-control.** SAST cannot confirm authorization, so these are
+   surfaced as HINTS in a separate manual-review section (IDOR rules for py/js/ruby,
+   route-level missing-auth heuristic), never mixed with confident findings.
+
+### Reliability (found while grading)
+
+Semgrep's multiprocessing intermittently returned an empty result set on the first
+scan of a tree -- a race that reads as "clean" and silently drops findings
+(reproduced: artgallery empty on 1/5 runs). Fixed with `--jobs 1` plus a
+confirmatory re-scan on empty. The fast scorecard is now stable across repeated
+runs. A failed scan still raises rather than returning a false-clean empty.
+
+### Arsenal: nuclei (live confirmation)
+
+`wbx verify <url>` runs nuclei against the AUTHORIZED challenge instance to confirm
+known-CVE / exposure, seeded by the frameworks the static scan detected. This is
+DAST and lives in its own subcommand; `wbx scan` never touches the network.
