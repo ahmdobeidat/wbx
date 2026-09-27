@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .brain import detect_chains, enrich_and_rank, merge_findings
+from .brain import apply_chain_bonus, detect_chains, enrich_and_rank, merge_findings
 from .engines import run_codeql, run_semgrep
 from .ingest import build_surface_map
 from .models import ScanResult
@@ -31,6 +31,8 @@ def scan(
     findings = merge_findings(findings)
     findings = enrich_and_rank(findings, surface)
     chains = detect_chains(findings, template_dir=chain_templates)
+    # findings on a detected flag-reaching chain get a within-tier ranking boost
+    findings = apply_chain_bonus(findings, chains)
 
     if scaffold_dir is not None:
         generate_scaffolds(findings, scaffold_dir)

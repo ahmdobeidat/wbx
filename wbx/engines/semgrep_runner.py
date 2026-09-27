@@ -18,6 +18,11 @@ from ..ingest.walk import SKIP_DIRS
 _RULES_DIR = Path(__file__).resolve().parents[2] / "rules" / "semgrep"
 
 
+class SemgrepError(RuntimeError):
+    """Raised when semgrep is present but a scan genuinely fails. Never swallowed
+    into an empty result -- a failed scan must not masquerade as a clean one."""
+
+
 def semgrep_available() -> bool:
     return shutil.which("semgrep") is not None
 
@@ -104,8 +109,23 @@ def _to_finding(result: dict[str, Any], root: Path) -> Finding:
     )
 
 
-def run_semgrep(root: str | Path, rules_dir: str | Path | None = None, timeout: int = 300) -> list[Finding]:
-    """Scan `root` with local rules. Returns [] if semgrep missing or errors non-fatally."""
+def run_semgrep(
+    root: str | Path,
+    rules_dir: str | Path | None = None,
+    timeout: int = 300,
+    retries: int = 2,
+) -> list[Finding]:
+    """Scan `root` with local rules.
+
+    Returns [] only when semgrep is not installed (a documented, explicit state).
+    A genuine scan failure (crash, empty output, unparseable JSON, error exit) is
+    retried up to `retries` times and then raises SemgrepError -- it is never
+    silently turned into an empty result, because an empty result reads as
+    'clean' and that is exactly the lie that makes a scanner unreliable.
+
+    Exit codes: semgrep returns 0 (no blocking findings) or 1 (blocking findings)
+    on a successful run; anything else is an error.
+    """
     if not semgrep_available():
         return []
     root = Path(root)
@@ -124,17 +144,31 @@ def run_semgrep(root: str | Path, rules_dir: str | Path | None = None, timeout: 
         cmd += ["--exclude", d]
     cmd.append(str(root))
 
-    try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
-    except (subprocess.TimeoutExpired, OSError):
-        return []
+    last_err = "unknown"
+    for attempt in range(retries + 1):
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            last_err = f"timeout after {timeout}s"
+            continue
+        except OSError as e:
+            last_err = f"could not launch semgrep: {e}"
+            continue
 
-    if not proc.stdout.strip():
-        return []
-    try:
-        data = json.loads(proc.stdout)
-    except json.JSONDecodeError:
-        return []
+        if proc.returncode not in (0, 1):
+            last_err = f"exit {proc.returncode}; stderr: {proc.stderr.strip()[:300]}"
+            continue
+        if not proc.stdout.strip():
+            last_err = f"empty stdout (exit {proc.returncode}); stderr: {proc.stderr.strip()[:300]}"
+            continue
+        try:
+            data = json.loads(proc.stdout)
+        except json.JSONDecodeError as e:
+            last_err = f"unparseable JSON: {e}"
+            continue
 
-    findings = [_to_finding(r, root) for r in data.get("results", [])]
-    return findings
+        return [_to_finding(r, root) for r in data.get("results", [])]
+
+    raise SemgrepError(
+        f"semgrep scan of {root} failed after {retries + 1} attempts: {last_err}"
+    )

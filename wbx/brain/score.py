@@ -46,8 +46,38 @@ _CLASS_DANGER = {
     "uncategorized": 2,
 }
 
-_SEVERITY_PTS = {"ERROR": 3, "WARNING": 2, "INFO": 1}
-_CONFIDENCE_PTS = {"HIGH": 3, "MEDIUM": 2, "LOW": 1}
+# Impact tier per vuln_class. The tier BASE dominates the score so a higher-impact
+# bug reliably outranks a lower-impact one regardless of how much evidence the
+# engines gathered for the weaker bug. Evidence bonuses only order findings WITHIN
+# a tier. This is the robust CTF-triage principle: an RCE primitive is the intended
+# path far more often than a disclosure/decoy sitting next to it.
+#   T1 = direct code/command execution    T2 = injection / auth-logic to flag
+#   T3 = file/data disclosure & SSRF      T4 = lower-impact / weak-signal
+_TIER = {
+    # --- Tier 1: direct RCE ---
+    "php_object_injection": 1, "insecure_deserialization": 1, "java_deserialization": 1,
+    "python_pickle": 1, "ruby_yaml_load": 1, "python_yaml_load": 1,
+    "command_injection": 1, "node_command_injection": 1, "php_command_injection": 1,
+    "python_eval_exec": 1, "php_eval": 1, "php_preg_replace_eval": 1, "ssti": 1,
+    # --- Tier 2: injection / auth-logic that reaches the flag directly ---
+    # php_lfi is here (not Tier 3): PHP LFI reads the flag directly and commonly
+    # escalates to RCE via wrappers/log poisoning, unlike generic path traversal.
+    "sql_injection": 2, "php_sqli": 2, "nosql_injection": 2, "prototype_pollution": 2,
+    "php_rfi": 2, "jwt_none_alg": 2, "auth_bypass": 2, "php_type_juggling": 2,
+    "php_lfi": 2,
+    # --- Tier 3: disclosure / traversal / SSRF / needs-a-chain ---
+    "path_traversal": 3, "ssrf": 3, "xxe": 3, "file_upload": 3,
+    # --- Tier 4: lower impact ---
+    "mass_assignment": 4, "open_redirect": 4, "xss": 4, "hardcoded_secret": 4,
+    "uncategorized": 4,
+}
+# Tier bases spaced so the top tier is never displaced by evidence (max evidence
+# ~24 < the 35-point Tier1->Tier2 gap). Lower gaps are narrower on purpose: a
+# strongly-evidenced disclosure bug may edge a weak lower-tier one, which is fine.
+_TIER_BASE = {1: 100, 2: 65, 3: 40, 4: 18}
+
+_SEVERITY_PTS = {"ERROR": 3, "WARNING": 2, "INFO": 0}
+_CONFIDENCE_PTS = {"HIGH": 3, "MEDIUM": 1, "LOW": 0}
 
 # proximity window (lines) for "sits near a flag/secret"
 _PROX_WINDOW = 8
@@ -60,6 +90,12 @@ def _proximity_hit(finding: Finding, hits: list[dict], window: int = _PROX_WINDO
     return None
 
 
+def _sort(findings: list[Finding]) -> None:
+    """Deterministic ordering: score desc, then a stable (file, line, rule) key so
+    a scan of the same tree always prints findings in the same order."""
+    findings.sort(key=lambda x: (-x.score, x.file, x.line, x.rule_id))
+
+
 def enrich_and_rank(findings: list[Finding], surface: SurfaceMap) -> list[Finding]:
     """Attach ctf_signals + score to each finding and return sorted desc by score."""
     route_files = {r["file"] for r in surface.routes}
@@ -67,32 +103,36 @@ def enrich_and_rank(findings: list[Finding], surface: SurfaceMap) -> list[Findin
 
     for f in findings:
         signals: dict = {}
-        score = 0.0
 
-        # class danger is the DOMINANT signal: in CTF the intended-bug class matters
-        # more than where it sits. Weighted x2 so contextual bonuses (route/entry)
-        # act as tiebreakers, not as things that lift a low-danger bug over an RCE.
-        danger = _CLASS_DANGER.get(f.vuln_class, 2)
-        signals["class_danger"] = {"pts": danger * 2, "why": f"{f.vuln_class} danger weight (x2)"}
-        score += danger * 2
+        tier = _TIER.get(f.vuln_class, 4)
+        base = _TIER_BASE[tier]
+        signals["impact_tier"] = {"pts": base, "why": f"tier {tier} ({f.vuln_class})"}
+        score = float(base)
 
         sev = _SEVERITY_PTS.get(f.severity, 1)
-        signals["severity"] = {"pts": sev, "why": f"severity={f.severity}"}
-        score += sev
+        if sev:
+            signals["severity"] = {"pts": sev, "why": f"severity={f.severity}"}
+            score += sev
 
         conf = _CONFIDENCE_PTS.get(f.confidence, 1)
-        signals["confidence"] = {"pts": conf, "why": f"confidence={f.confidence}"}
-        score += conf
+        if conf:
+            signals["confidence"] = {"pts": conf, "why": f"confidence={f.confidence}"}
+            score += conf
 
         # reaches user input (a taint source was resolved)
         if f.source or f.dataflow:
             signals["tainted"] = {"pts": 4, "why": "resolved taint source -> reaches user input"}
             score += 4
 
-        # engine agreement / codeql taint path is strong evidence
+        # codeql proved a dataflow path
         if f.engine == "codeql":
             signals["codeql_path"] = {"pts": 3, "why": "codeql proved a dataflow path"}
             score += 3
+
+        # both engines flagged this bug -> strong corroboration
+        if f.metadata.get("corroborated_by"):
+            signals["corroborated"] = {"pts": 5, "why": "semgrep + codeql agree"}
+            score += 5
 
         # sits on a route / entrypoint file
         if f.file in route_files:
@@ -105,20 +145,33 @@ def enrich_and_rank(findings: list[Finding], surface: SurfaceMap) -> list[Findin
         # proximity to a flag literal or flag-file reference
         fh = _proximity_hit(f, surface.flag_hits)
         if fh:
-            pts = 6 if fh.get("kind") == "flag_literal" else 4
+            pts = 4 if fh.get("kind") == "flag_literal" else 2
             signals["near_flag"] = {"pts": pts, "why": f"{fh.get('kind')} within {_PROX_WINDOW} lines"}
             score += pts
 
         # proximity to a secret
         sh = _proximity_hit(f, surface.secret_hits)
         if sh:
-            signals["near_secret"] = {"pts": 3, "why": f"{sh.get('kind')} within {_PROX_WINDOW} lines"}
-            score += 3
+            signals["near_secret"] = {"pts": 2, "why": f"{sh.get('kind')} within {_PROX_WINDOW} lines"}
+            score += 2
 
         f.ctf_signals = signals
         f.score = round(score, 2)
 
-    findings.sort(key=lambda x: (x.score, x.severity == "ERROR"), reverse=True)
+    _sort(findings)
+    return findings
+
+
+def apply_chain_bonus(findings: list[Finding], chains) -> list[Finding]:
+    """Reward findings that participate in a detected escalation chain: a bug on a
+    known path to the flag is more likely the intended one than a standalone decoy.
+    Runs after chain detection, then re-sorts. Bonus stays within-tier by design."""
+    in_chain = {f.location for c in chains for f in c.findings}
+    for f in findings:
+        if f.location in in_chain and "in_chain" not in f.ctf_signals:
+            f.ctf_signals["in_chain"] = {"pts": 6, "why": "part of a flag-reaching chain"}
+            f.score = round(f.score + 6, 2)
+    _sort(findings)
     return findings
 
 

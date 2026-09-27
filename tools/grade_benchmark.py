@@ -23,6 +23,7 @@ import yaml
 # import wbx from the sibling repo
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from wbx.pipeline import scan  # noqa: E402
+from wbx.engines import SemgrepError  # noqa: E402
 
 # generic author vocabulary -> wbx vuln_class set that legitimately represents it
 VOCAB_MAP: dict[str, set[str]] = {
@@ -74,7 +75,18 @@ def grade_one(chal_dir: Path, deep: bool) -> dict:
     want_classes = _classes_for(intended["vuln"])
     want_file = Path(intended["file"]).name
 
-    result = scan(chal_dir / "source", deep=deep)
+    try:
+        result = scan(chal_dir / "source", deep=deep)
+    except SemgrepError as e:
+        # a failed scan is NOT a miss -- surface it distinctly so a transient
+        # never gets silently scored as "intended bug not found".
+        return {
+            "name": ans["name"], "language": ans.get("language", "?"),
+            "difficulty": ans.get("difficulty", "?"), "intended": intended["vuln"],
+            "requires_deep": intended.get("requires_deep", False),
+            "verdict": "SCAN_ERROR", "rank": None, "total_findings": 0,
+            "decoy_above": False, "chain_relevant": False, "top3": [], "error": str(e),
+        }
     findings = result.findings
 
     # find the rank of the first finding that matches intended class + file
@@ -167,6 +179,7 @@ def main() -> int:
     top3 = sum(1 for r in rows if r["verdict"] in {"TOP1", "TOP3"})
     misses = [r for r in rows if r["verdict"] == "MISS"]
     wrongfile = [r for r in rows if r["verdict"] == "WRONG_FILE"]
+    scan_errors = [r for r in rows if r["verdict"] == "SCAN_ERROR"]
     decoy_probs = [r for r in rows if r["decoy_above"]]
 
     print(f"\nrecall (found intended bug):     {found}/{n}")
@@ -174,6 +187,10 @@ def main() -> int:
     print(f"precision (intended in top 3):   {top3}/{n}")
     print(f"chain relevant fired:            {sum(1 for r in rows if r['chain_relevant'])}/{n}")
 
+    if scan_errors:
+        print("\nSCAN ERRORS (scan failed, NOT a miss -- investigate):")
+        for r in scan_errors:
+            print(f"  - {r['name']}: {r.get('error', '')[:160]}")
     if misses:
         print("\nMISSES (intended bug not found at all):")
         for r in misses:

@@ -5,7 +5,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from .engines import codeql_available, semgrep_available
+from .engines import SemgrepError, codeql_available, semgrep_available
 from .pipeline import scan
 from .report import render_json, render_markdown, render_terminal
 
@@ -24,7 +24,13 @@ def _cmd_scan(args: argparse.Namespace) -> int:
     out_dir = Path(args.out) if args.out else root.parent / f"{root.name}-wbx"
     scaffold_dir = None if args.no_scaffolds else out_dir / "scaffolds"
 
-    result = scan(root, deep=args.deep, scaffold_dir=scaffold_dir)
+    try:
+        result = scan(root, deep=args.deep, scaffold_dir=scaffold_dir)
+    except SemgrepError as e:
+        print(f"error: scan failed (not a clean result): {e}", file=sys.stderr)
+        print("The scan did NOT complete. Do not treat the absence of findings as safe.",
+              file=sys.stderr)
+        return 3
 
     # always write full md + json artifacts
     out_dir.mkdir(parents=True, exist_ok=True)

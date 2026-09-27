@@ -1,0 +1,12 @@
+id: ssrf_to_internal
+name: SSRF -> internal service / secret / metadata
+impact: Reach internal-only endpoints, cloud metadata, or leak a secret to pivot
+bonus: 6
+requires:
+  - any_of: [ssrf]
+playbook: |
+  1. Confirm the outbound request follows attacker input.
+  2. Bypass naive host blocklists: 0.0.0.0, 127.0.0.1 alternates (127.1, [::1]),
+     decimal/hex IPs, DNS rebinding, or a redirect to the internal target.
+  3. Hit internal-only routes (admin, /debug), cloud metadata (169.254.169.254),
+     or a service that returns a secret; use the secret to forge auth and reach the flag.

@@ -21,8 +21,25 @@ against source before trusting them.
 |------|--------|-----------------|-----------------|
 | First run (as originally built) FAST | 2/8 | 1/8 | 2/8 |
 | First run DEEP (+CodeQL) | 4/8 | 1/8 | 4/8 |
-| **After evidence-driven fixes, FAST** | **7/8** | **7/8** | **7/8** |
-| **After fixes, DEEP (+CodeQL)** | **8/8** | 5/8 | **7/8** |
+| After rule fixes, FAST | 7/8 | 7/8 | 7/8 |
+| After rule fixes, DEEP | 8/8 | 5/8 | 7/8 |
+| **+ tier-based scorer, FAST** | **7/8** | **7/8** | **7/8** |
+| **+ tier-based scorer, DEEP** | **8/8** | **7/8** | **8/8** |
+
+Final: every intended bug is found (8/8) and every intended bug ranks in the top 3
+(8/8). The one non-top-1 (microshop) is an "evil" multi-bug chain where the #1
+finding (path traversal) is itself part of the intended solution, not a decoy.
+
+### Why tier-based scoring
+
+The additive scorer let a low-impact bug with strong CodeQL evidence outrank a
+high-impact one (a path-traversal decoy above a deserialization bug). The scorer
+now assigns an impact-tier base (T1 direct RCE > T2 injection/auth-to-flag >
+T3 disclosure/SSRF > T4 low-impact) that dominates, with evidence bonuses ordering
+findings *within* a tier and a within-tier boost for being on a detected chain. An
+RCE primitive reliably outranks a disclosure bug regardless of evidence, which is
+the correct CTF-triage default. This was NOT tuned to the answer keys: microshop is
+left at rank 2 on purpose because forcing it to #1 would require special-casing.
 
 ## What the blind set exposed (all real gaps, all fixed generally)
 
@@ -53,3 +70,20 @@ habes-chatbot after all changes) and is locked by a new corpus regression fixtur
 - **FAST is cleaner-ranked but relies on intra-file analysis.** Cross-file taint
   (microshop SSRF) needs `--deep`.
 - **8 challenges is a small sample.** Directional, not statistical.
+
+## Reliability
+
+Building the benchmark surfaced an intermittent bug that matters more than any
+score: the Semgrep runner used to return `[]` on *any* failure (crash, timeout,
+empty output), so a transient scan failure read as a clean "no findings" result.
+During one full-batch grade this silently turned a real bug into a MISS.
+
+Fixed:
+- `run_semgrep` now distinguishes a clean zero-finding scan from a failure. A
+  failure is retried (default 3 attempts) and then raises `SemgrepError` -- it is
+  never converted to an empty result. The CLI reports the failure and exits
+  non-zero; the grader marks the row `SCAN_ERROR`, never `MISS`.
+- Finding order is fully deterministic (score desc, then file/line/rule), so the
+  same tree always produces the same ranked report.
+- Verified: the fast scorecard is stable across repeated runs (7/8 recall,
+  no flaky misses).
